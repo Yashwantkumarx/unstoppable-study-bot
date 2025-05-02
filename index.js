@@ -35,7 +35,6 @@ client.on('ready', async () => {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName === 'myhours') {
-    if (interaction.commandName === 'myhours') {
     const data = await StudyTime.findOne({ userId: interaction.user.id });
     const cameraOnHours = data ? Math.floor(data.cameraOn / 3600) : 0;
     const cameraOffHours = data ? Math.floor(data.cameraOff / 3600) : 0;
