@@ -17,15 +17,11 @@ client.commands = new Collection();
 const studyData = {};
 const cameraStatus = {};
 const userVoiceState = {};
-
-// Camera ON room ID (supervised)
 const CAMERA_ON_ROOM_ID = '1300572813047894119';
 
-// Random taglines
 const focusTaglines = ["Laser Focus", "Deep Concentration", "Focus Mode", "Zen State", "Study Warrior"];
 const silentTaglines = ["Silent Hustle", "Solo Grind", "Peaceful Push", "Underground Effort", "Hidden Focus"];
 
-// Slash Commands
 const commands = [
   new SlashCommandBuilder()
     .setName('myhours')
@@ -35,12 +31,28 @@ const commands = [
     .setName('addhours')
     .setDescription('Add hours to a user.')
     .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
-    .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true)),
+    .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true))
+    .addStringOption(option =>
+      option.setName('type')
+        .setDescription('Camera type')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Camera On', value: 'camOn' },
+          { name: 'Camera Off', value: 'camOff' }
+        )),
   new SlashCommandBuilder()
     .setName('removehours')
     .setDescription('Remove hours from a user.')
     .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
-    .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true)),
+    .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true))
+    .addStringOption(option =>
+      option.setName('type')
+        .setDescription('Camera type')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Camera On', value: 'camOn' },
+          { name: 'Camera Off', value: 'camOff' }
+        )),
   new SlashCommandBuilder()
     .setName('setcamera')
     .setDescription('Set your camera status.')
@@ -67,7 +79,6 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     studyData[userId] = { camOn: 0, camOff: 0 };
   }
 
-  // User joins voice channel
   if (!oldState.channel && newState.channel) {
     const defaultCam = newState.channelId === CAMERA_ON_ROOM_ID ? 'camOn' : 'camOff';
     userVoiceState[userId] = {
@@ -76,7 +87,6 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     };
   }
 
-  // User leaves voice channel
   if (oldState.channel && !newState.channel && userVoiceState[userId]) {
     const duration = (now - userVoiceState[userId].startTime) / (1000 * 60 * 60);
     const camType = userVoiceState[userId].camera;
@@ -122,19 +132,19 @@ client.on('interactionCreate', async interaction => {
   if (commandName === 'addhours') {
     const targetUser = options.getUser('user');
     const hours = options.getInteger('hours');
-    const cam = cameraStatus[targetUser.id] || 'camOff';
+    const type = options.getString('type');
     if (!studyData[targetUser.id]) studyData[targetUser.id] = { camOn: 0, camOff: 0 };
-    studyData[targetUser.id][cam] += hours;
-    return interaction.reply(`Added ${hours} hrs to ${targetUser.username}'s ${cam === 'camOn' ? 'Camera On' : 'Camera Off'} time.`);
+    studyData[targetUser.id][type] += hours;
+    return interaction.reply(`Added ${hours} hrs to ${targetUser.username}'s ${type === 'camOn' ? 'Camera On' : 'Camera Off'} time.`);
   }
 
   if (commandName === 'removehours') {
     const targetUser = options.getUser('user');
     const hours = options.getInteger('hours');
-    const cam = cameraStatus[targetUser.id] || 'camOff';
+    const type = options.getString('type');
     if (!studyData[targetUser.id]) studyData[targetUser.id] = { camOn: 0, camOff: 0 };
-    studyData[targetUser.id][cam] = Math.max(0, studyData[targetUser.id][cam] - hours);
-    return interaction.reply(`Removed ${hours} hrs from ${targetUser.username}'s ${cam === 'camOn' ? 'Camera On' : 'Camera Off'} time.`);
+    studyData[targetUser.id][type] = Math.max(0, studyData[targetUser.id][type] - hours);
+    return interaction.reply(`Removed ${hours} hrs from ${targetUser.username}'s ${type === 'camOn' ? 'Camera On' : 'Camera Off'} time.`);
   }
 });
 
