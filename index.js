@@ -35,14 +35,13 @@ client.on('ready', async () => {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName === 'myhours') {
-    await interaction.reply(`**Hey ${interaction.user.username}! Here's your Study Report**  
-Camera ON: ${cameraOnHours} hrs 🟢📷  
-Camera OFF: ${cameraOffHours} hrs ⚫📷  
+    if (interaction.commandName === 'myhours') {
+    const data = await StudyTime.findOne({ userId: interaction.user.id });
+    const cameraOnHours = data ? Math.floor(data.cameraOn / 3600) : 0;
+    const cameraOffHours = data ? Math.floor(data.cameraOff / 3600) : 0;
 
-${cameraOnHours >= 5 ? '⭐ Legendary Focus Mode!' : cameraOnHours >= 2 ? '✅ Great job, keep going!' : '⏳ Time to power up your study game!'}`);
-  }
-});
-
+    await interaction.reply(`**Tumhare Study Hours**\nCamera ON: ${cameraOnHours} hrs\nCamera OFF: ${cameraOffHours} hrs`);
+}
 // Function to generate leaderboard text
 function generateLeaderboard(title, onList, offList) {
   const formatList = (list, emoji) => list.map((u, i) => `${i === 0 ? '👑' : ''}${i + 1}. ${u}`).join('\n') || 'No data';
