@@ -35,7 +35,11 @@ client.on('ready', async () => {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName === 'myhours') {
-    await interaction.reply('**Tumhare Study Hours**\nCamera ON: 2 hrs\nCamera OFF: 3 hrs (demo values)');
+    await interaction.reply(`**Hey ${interaction.user.username}! Here's your Study Report**  
+Camera ON: ${cameraOnHours} hrs 🟢📷  
+Camera OFF: ${cameraOffHours} hrs ⚫📷  
+
+${cameraOnHours >= 5 ? '⭐ Legendary Focus Mode!' : cameraOnHours >= 2 ? '✅ Great job, keep going!' : '⏳ Time to power up your study game!'}`);
   }
 });
 
