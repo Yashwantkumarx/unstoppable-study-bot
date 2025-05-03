@@ -1,4 +1,3 @@
-// FULL index.js — Real-time Study Tracker Bot with Leaderboards
 const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Collection, PermissionsBitField } = require('discord.js');
 const cron = require('node-cron');
 const fs = require('fs');
@@ -7,51 +6,57 @@ const express = require('express');
 require('dotenv').config();
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.MessageContent],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.MessageContent
+  ],
   partials: [Partials.Channel]
 });
 
 client.commands = new Collection();
 
-const CAMERA_ON_ROOM_ID = '1300572813047894119';
+const CAMERA_ON_ROOM_ID = '1300572813047894119'; // camera on VC ID
 const DAILY_CHANNEL_ID = '1367618478747680870';
 const WEEKLY_CHANNEL_ID = '1367618555339870208';
 const MONTHLY_CHANNEL_ID = '1367618620460499037';
-const DATA_FILE_PATH = './data.json';
+const DATA_FILE = './data.json';
 
 let data = { dailyData: {}, weeklyData: {}, monthlyData: {}, studyData: {} };
+const joinTimestamps = {};
 
 function loadData() {
   try {
-    const fileData = fs.readFileSync(DATA_FILE_PATH, 'utf8');
-    data = JSON.parse(fileData);
+    const raw = fs.readFileSync(DATA_FILE, 'utf8');
+    data = JSON.parse(raw);
   } catch {
     saveData();
   }
 }
 
 function saveData() {
-  fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(data, null, 2));
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-const focusTaglines = ["Laser Focus", "Deep Concentration", "Focus Mode", "Zen State", "Study Warrior"];
-const silentTaglines = ["Silent Hustle", "Solo Grind", "Peaceful Push", "Underground Effort", "Hidden Focus"];
+const focusTaglines = ["Focus Mode", "Laser Focus", "Unbreakable Flow", "Mindful Minutes", "Concentration King"];
+const silentTaglines = ["Silent Hustle", "Quiet Grind", "Alone But Focused", "Peaceful Push", "Hidden Effort"];
 
 const commands = [
   new SlashCommandBuilder().setName('myhours').setDescription("Check today's study hours.")
-    .addUserOption(option => option.setName('user').setDescription('User').setRequired(false)),
-  new SlashCommandBuilder().setName('addhours').setDescription('Add hours to a user.')
-    .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
-    .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true))
-    .addStringOption(option => option.setName('type').setDescription('Camera type').setRequired(true)
+    .addUserOption(opt => opt.setName('user').setDescription('User').setRequired(false)),
+  new SlashCommandBuilder().setName('addhours').setDescription('Add hours for a user.')
+    .addUserOption(opt => opt.setName('user').setDescription('User').setRequired(true))
+    .addIntegerOption(opt => opt.setName('hours').setDescription('Hours').setRequired(true))
+    .addStringOption(opt => opt.setName('type').setDescription('Camera Type').setRequired(true)
       .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
-  new SlashCommandBuilder().setName('removehours').setDescription('Remove hours from a user.')
-    .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
-    .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true))
-    .addStringOption(option => option.setName('type').setDescription('Camera type').setRequired(true)
+  new SlashCommandBuilder().setName('removehours').setDescription('Remove hours for a user.')
+    .addUserOption(opt => opt.setName('user').setDescription('User').setRequired(true))
+    .addIntegerOption(opt => opt.setName('hours').setDescription('Hours').setRequired(true))
+    .addStringOption(opt => opt.setName('type').setDescription('Camera Type').setRequired(true)
       .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
-  new SlashCommandBuilder().setName('setcamera').setDescription('Set camera status.')
-    .addStringOption(option => option.setName('status').setDescription('Camera Status').setRequired(true)
+  new SlashCommandBuilder().setName('setcamera').setDescription('Set camera type for your study hours.')
+    .addStringOption(opt => opt.setName('type').setDescription('Camera Type').setRequired(true)
       .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' }))
 ];
 
@@ -62,28 +67,57 @@ client.once('ready', async () => {
   console.log(`Bot is online as ${client.user.tag}`);
 });
 
-function generateLeaderboard(title, dataSet) {
-  const sorted = Object.entries(dataSet).sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff));
+client.on('voiceStateUpdate', (oldState, newState) => {
+  const userId = newState.id;
+
+  if (!oldState.channelId && newState.channelId) {
+    joinTimestamps[userId] = Date.now();
+  }
+
+  if (oldState.channelId && !newState.channelId) {
+    const startTime = joinTimestamps[userId];
+    if (!startTime) return;
+    const durationMs = Date.now() - startTime;
+    const durationHrs = durationMs / (1000 * 60 * 60);
+
+    const type = newState.channelId === CAMERA_ON_ROOM_ID ? 'camOn' : 'camOff';
+
+    if (!data.studyData[userId]) data.studyData[userId] = { camOn: 0, camOff: 0 };
+    if (!data.dailyData[userId]) data.dailyData[userId] = { camOn: 0, camOff: 0 };
+    if (!data.weeklyData[userId]) data.weeklyData[userId] = { camOn: 0, camOff: 0 };
+    if (!data.monthlyData[userId]) data.monthlyData[userId] = { camOn: 0, camOff: 0 };
+
+    data.studyData[userId][type] += durationHrs;
+    data.dailyData[userId][type] += durationHrs;
+    data.weeklyData[userId][type] += durationHrs;
+    data.monthlyData[userId][type] += durationHrs;
+
+    saveData();
+    delete joinTimestamps[userId];
+  }
+});
+
+function generateLeaderboard(title, dataset) {
+  const sorted = Object.entries(dataset).sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff));
   if (sorted.length === 0) return `No data available for ${title} leaderboard.`;
 
   const now = new Date();
-  let dateLabel = "";
-  if (title === 'Daily') dateLabel = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  else if (title === 'Weekly') dateLabel = `Week of ${now.toLocaleDateString('en-US')}`;
-  else if (title === 'Monthly') dateLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  let label = "";
+  if (title === 'Daily') label = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  else if (title === 'Weekly') label = `Week of ${now.toLocaleDateString('en-US')}`;
+  else if (title === 'Monthly') label = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  let message = `@everyone\n**${title} Leaderboard (${dateLabel})**\n\n`;
-  sorted.forEach(([userId, hours], index) => {
-    const total = hours.camOn + hours.camOff;
-    message += `**#${index + 1}** <@${userId}> — **${total.toFixed(2)} hrs** (✅ ${hours.camOn.toFixed(2)} | ❌ ${hours.camOff.toFixed(2)})\n`;
+  let msg = `@everyone\n**${title} Leaderboard (${label})**\n\n`;
+  sorted.forEach(([id, h], i) => {
+    const total = h.camOn + h.camOff;
+    msg += `**#${i + 1}** <@${id}> — **${total.toFixed(2)} hrs** (✅ ${h.camOn.toFixed(2)} | ❌ ${h.camOff.toFixed(2)})\n`;
   });
-  return message;
+  return msg;
 }
 
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
   const { commandName, user, options, member } = interaction;
-
   loadData();
 
   if (commandName === 'myhours') {
@@ -100,7 +134,7 @@ client.on('interactionCreate', async interaction => {
       `**⚡ Keep going, Champion! You're unstoppable!**`);
   }
 
-  if (commandName === 'addhours' || commandName === 'removehours') {
+  if (['addhours', 'removehours'].includes(commandName)) {
     if (!member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
       return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
     }
@@ -128,72 +162,41 @@ client.on('interactionCreate', async interaction => {
     }
 
     saveData();
-    return interaction.reply(`Successfully ${isAdd ? 'added' : 'removed'} ${hoursValue} hours ${isAdd ? 'to' : 'from'} ${targetUser.username}'s ${type}.`);
+    return interaction.reply(`Successfully ${isAdd ? 'added' : 'removed'} ${hoursValue} hrs ${isAdd ? 'to' : 'from'} ${targetUser.username}'s ${type} time.`);
   }
 
   if (commandName === 'setcamera') {
-    const status = options.getString('status');
-    if (!data.studyData[user.id]) data.studyData[user.id] = { camOn: 0, camOff: 0, camera: status };
-    else data.studyData[user.id].camera = status;
+    const cameraType = options.getString('type');
+    if (!data.studyData[user.id]) data.studyData[user.id] = { camOn: 0, camOff: 0 };
+    data.studyData[user.id].cameraType = cameraType;
 
     saveData();
-    return interaction.reply(`Your camera has been set to **${status === 'camOn' ? 'On' : 'Off'}**.`);
+    return interaction.reply(`Your camera type has been set to **${cameraType === 'camOn' ? 'Camera On' : 'Camera Off'}**.`);
   }
 });
 
-// Scheduled Leaderboards
+// Daily leaderboard
 cron.schedule('59 23 * * *', () => {
-  const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
-  channel?.send(generateLeaderboard('Daily', data.dailyData));
+  const ch = client.channels.cache.get(DAILY_CHANNEL_ID);
+  ch?.send(generateLeaderboard('Daily', data.dailyData));
   data.dailyData = {};
   saveData();
 });
 
+// Weekly leaderboard
 cron.schedule('59 23 * * 0', () => {
-  const channel = client.channels.cache.get(WEEKLY_CHANNEL_ID);
-  channel?.send(generateLeaderboard('Weekly', data.weeklyData));
+  const ch = client.channels.cache.get(WEEKLY_CHANNEL_ID);
+  ch?.send(generateLeaderboard('Weekly', data.weeklyData));
   data.weeklyData = {};
   saveData();
 });
 
+// Monthly leaderboard (last day of month)
 cron.schedule('59 23 28-31 * *', () => {
-  const now = new Date();
-  if (now.getDate() === new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()) {
-    const channel = client.channels.cache.get(MONTHLY_CHANNEL_ID);
-    channel?.send(generateLeaderboard('Monthly', data.monthlyData));
-    data.monthlyData = {};
-    saveData();
-  }
+  const ch = client.channels.cache.get(MONTHLY_CHANNEL_ID);
+  ch?.send(generateLeaderboard('Monthly', data.monthlyData));
+  data.monthlyData = {};
+  saveData();
 });
-
-// Auto-backup
-cron.schedule('0 1 * * *', () => {
-  const date = new Date().toISOString().split('T')[0];
-  fs.copyFileSync(DATA_FILE_PATH, path.join(__dirname, `data-backup-${date}.json`));
-});
-
-// Dashboard
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get('/leaderboard/:type', (req, res) => {
-  loadData();
-  const type = req.params.type;
-  const dataset = type === 'daily' ? data.dailyData : type === 'weekly' ? data.weeklyData : type === 'monthly' ? data.monthlyData : null;
-  if (!dataset) return res.status(400).send('Invalid leaderboard type.');
-
-  const sorted = Object.entries(dataset).sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff))
-    .map(([id, { camOn, camOff }], i) => ({
-      rank: i + 1,
-      userId: id,
-      camOn: camOn.toFixed(2),
-      camOff: camOff.toFixed(2),
-      total: (camOn + camOff).toFixed(2)
-    }));
-
-  res.json(sorted);
-});
-
-app.listen(PORT, () => console.log(`Dashboard running at http://localhost:${PORT}`));
 
 client.login(process.env.TOKEN);
