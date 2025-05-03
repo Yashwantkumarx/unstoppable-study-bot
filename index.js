@@ -137,18 +137,11 @@ if (commandName === 'myhours') {
 
   return interaction.reply(
     `**✨ Hey _${targetUser.username}_! Here's your Study Report
-    
-   📆 ${currentDate}:**\n` +
-    
-    
+      📆 ${currentDate}:**\n` +    
     `**📷 Camera On:** **${data.camOn.toFixed(2)} hrs ✅** — _${focusTag}_\n` +
     `**📷 Camera Off:** **${data.camOff.toFixed(2)} hrs ❌** — _${silentTag}_\n` +
-    
-    
-    `**🕒 Total Time:** **${total.toFixed(2)} hrs**\n` +
-    
-    
-    `**⚡ Keep going, Champion! You're unstoppable!**`
+        `**🕒 Total Time:** **${total.toFixed(2)} hrs**\n` +
+        `**⚡ Keep going, Champion! You're unstoppable!**`
   );
 }
 
