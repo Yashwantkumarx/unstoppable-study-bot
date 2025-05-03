@@ -206,12 +206,4 @@ cron.schedule('0 0 28-31 * *', () => {
   }
 });
 
-cron.schedule('0 3 * * *', () => {
-  const backupFile = `./backups/data-backup-${new Date().toISOString().split('T')[0]}.json`;
-  fs.copyFile(DATA_FILE, backupFile, err => {
-    if (err) console.error("Backup failed:", err);
-    else console.log("Backup created at:", backupFile);
-  });
-});
-
 client.login(process.env.TOKEN);
