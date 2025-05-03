@@ -1,6 +1,3 @@
-
-// index.js - Final Study Tracker Bot with full features
-
 const { Client, GatewayIntentBits, Collection, SlashCommandBuilder, REST, Routes, Events, EmbedBuilder } = require('discord.js');
 const fs = require('fs');
 const cron = require('node-cron');
