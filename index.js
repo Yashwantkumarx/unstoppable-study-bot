@@ -71,32 +71,6 @@ client.once('ready', async () => {
   console.log(`Bot is online as ${client.user.tag}`);
 });
 
-client.on('voiceStateUpdate', (oldState, newState) => {
-  const userId = newState.id;
-  const now = Date.now();
-  if (!data.studyData[userId]) data.studyData[userId] = { camOn: 0, camOff: 0 };
-
-  if (!oldState.channel && newState.channel) {
-    const defaultCam = newState.channelId === CAMERA_ON_ROOM_ID ? 'camOn' : 'camOff';
-    data.studyData[userId].startTime = now;
-    data.studyData[userId].camera = defaultCam;
-  }
-
-  if (oldState.channel && !newState.channel && data.studyData[userId]?.startTime) {
-    const duration = (now - data.studyData[userId].startTime) / 3600000;
-    const camType = data.studyData[userId].camera;
-    if (!data.dailyData[userId]) data.dailyData[userId] = { camOn: 0, camOff: 0 };
-    if (!data.weeklyData[userId]) data.weeklyData[userId] = { camOn: 0, camOff: 0 };
-    if (!data.monthlyData[userId]) data.monthlyData[userId] = { camOn: 0, camOff: 0 };
-    data.dailyData[userId][camType] += duration;
-    data.weeklyData[userId][camType] += duration;
-    data.monthlyData[userId][camType] += duration;
-    data.studyData[userId][camType] += duration;
-    delete data.studyData[userId].startTime;
-    saveData();
-  }
-});
-
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
   const { commandName, user, options } = interaction;
@@ -115,29 +89,58 @@ client.on('interactionCreate', async interaction => {
       `**⚡ Keep going, Champion! You're unstoppable!**`);
   }
 
-  if (commandName === 'addhours' || commandName === 'removehours') {
+  if (commandName === 'addhours') {
     const targetUser = options.getUser('user');
-    const hours = options.getInteger('hours');
+    const hoursToAdd = options.getInteger('hours');
     const type = options.getString('type');
-    if (!data.studyData[targetUser.id]) data.studyData[targetUser.id] = { camOn: 0, camOff: 0 };
-
-    if (commandName === 'addhours') {
-      data.studyData[targetUser.id][type] += hours;
-      // Also update the daily, weekly, and monthly data
-      data.dailyData[targetUser.id][type] += hours;
-      data.weeklyData[targetUser.id][type] += hours;
-      data.monthlyData[targetUser.id][type] += hours;
-      saveData();
-      return interaction.reply(`Added ${hours} hrs to ${targetUser.username}'s ${type}.`);
-    } else {
-      data.studyData[targetUser.id][type] = Math.max(0, data.studyData[targetUser.id][type] - hours);
-      // Also update the daily, weekly, and monthly data
-      data.dailyData[targetUser.id][type] = Math.max(0, data.dailyData[targetUser.id][type] - hours);
-      data.weeklyData[targetUser.id][type] = Math.max(0, data.weeklyData[targetUser.id][type] - hours);
-      data.monthlyData[targetUser.id][type] = Math.max(0, data.monthlyData[targetUser.id][type] - hours);
-      saveData();
-      return interaction.reply(`Removed ${hours} hrs from ${targetUser.username}'s ${type}.`);
+    
+    // Ensure the targetUser's data is initialized
+    if (!data.studyData[targetUser.id]) {
+      data.studyData[targetUser.id] = { camOn: 0, camOff: 0 };
     }
+    
+    // Update the study data for the user
+    data.studyData[targetUser.id][type] += hoursToAdd;
+
+    // Also update the daily, weekly, and monthly data
+    if (!data.dailyData[targetUser.id]) data.dailyData[targetUser.id] = { camOn: 0, camOff: 0 };
+    if (!data.weeklyData[targetUser.id]) data.weeklyData[targetUser.id] = { camOn: 0, camOff: 0 };
+    if (!data.monthlyData[targetUser.id]) data.monthlyData[targetUser.id] = { camOn: 0, camOff: 0 };
+
+    data.dailyData[targetUser.id][type] += hoursToAdd;
+    data.weeklyData[targetUser.id][type] += hoursToAdd;
+    data.monthlyData[targetUser.id][type] += hoursToAdd;
+
+    // Save the updated data
+    saveData();
+
+    // Return confirmation
+    return interaction.reply(`Successfully added ${hoursToAdd} hours to ${targetUser.username}'s ${type}.`);
+  }
+
+  if (commandName === 'removehours') {
+    const targetUser = options.getUser('user');
+    const hoursToRemove = options.getInteger('hours');
+    const type = options.getString('type');
+    
+    // Ensure the targetUser's data is initialized
+    if (!data.studyData[targetUser.id]) {
+      data.studyData[targetUser.id] = { camOn: 0, camOff: 0 };
+    }
+    
+    // Remove the hours and prevent going negative
+    data.studyData[targetUser.id][type] = Math.max(0, data.studyData[targetUser.id][type] - hoursToRemove);
+
+    // Also update the daily, weekly, and monthly data
+    data.dailyData[targetUser.id][type] = Math.max(0, data.dailyData[targetUser.id][type] - hoursToRemove);
+    data.weeklyData[targetUser.id][type] = Math.max(0, data.weeklyData[targetUser.id][type] - hoursToRemove);
+    data.monthlyData[targetUser.id][type] = Math.max(0, data.monthlyData[targetUser.id][type] - hoursToRemove);
+
+    // Save the updated data
+    saveData();
+
+    // Return confirmation
+    return interaction.reply(`Successfully removed ${hoursToRemove} hours from ${targetUser.username}'s ${type}.`);
   }
 
   if (commandName === 'setcamera') {
