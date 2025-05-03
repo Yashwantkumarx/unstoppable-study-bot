@@ -108,12 +108,14 @@ function generateLeaderboard(title, dataset) {
   const sorted = Object.entries(dataset).sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff));
   if (sorted.length === 0) return `No data available for ${title} leaderboard.\n**Server: Unstoppable | Owner: Yashwant Kumar**`;
 
-  const now = new Date();
+  const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const date = new Date(now);
+
   const label = title === 'Daily'
-    ? now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    ? date.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : title === 'Weekly'
-    ? `Week of ${now.toLocaleDateString('en-IN')}`
-    : now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    ? `Week of ${date.toLocaleDateString('en-IN')}`
+    : date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
   let msg = `@everyone\n__**${title} Leaderboard (${label})**__\n**Server: Unstoppable | Owner: Yashwant Kumar**\n`;
   sorted.forEach(([id, h], i) => {
@@ -132,7 +134,14 @@ client.on('interactionCreate', async interaction => {
     const hours = data.dailyData[target.id] || { camOn: 0, camOff: 0 };
     const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
     const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
-    const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    const today = new Date().toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
 
     const embed = new EmbedBuilder()
       .setTitle(`📊 ${target.username}'s Study Report`)
