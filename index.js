@@ -196,7 +196,22 @@ function leaderboardMessage(dataType, data) {
     day: 'numeric'
   });
 
-  return `**@everyone**\n**${dataType} Leaderboard for the week from ${weekStartDate} to ${weekEndDate}**\n\n` + sorted.map(([id, d], i) => {
+  // Format the current month name (e.g., "May 2025")
+  const currentMonth = currentDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  // Determine the leaderboard type and display accordingly
+  let leaderboardTitle = '';
+  if (dataType === 'Daily') {
+    leaderboardTitle = `**Daily Leaderboard for ${currentDate.toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    })}**`;
+  } else if (dataType === 'Weekly') {
+    leaderboardTitle = `**Weekly Leaderboard from ${weekStartDate} to ${weekEndDate}**`;
+  } else if (dataType === 'Monthly') {
+    leaderboardTitle = `**Monthly Leaderboard for ${currentMonth}**`;
+  }
+
+  return `**@everyone**\n${leaderboardTitle}\n\n` + sorted.map(([id, d], i) => {
     const crown = i === 0 ? '👑 ' : '';
     return `${crown}<@${id}> 📷 Camera On: **${d.camOn.toFixed(1)} hrs ✅** | 📷 Camera Off: **${d.camOff.toFixed(1)} hrs ❌**`;
   }).join('\n\n');
