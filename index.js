@@ -19,12 +19,8 @@ const cameraStatus = {};
 const userVoiceState = {};
 const CAMERA_ON_ROOM_ID = '1300572813047894119';
 
-const dailyFocusTags = ["Daily Hustler", "Fresh Grind", "New Day, New Wins", "Consistent Start", "Every Hour Counts"];
-const dailySilentTags = ["Silent Sprint", "Quick Push", "Focused Burst", "Micro Mission", "Low-Key Legend"];
-const weeklyFocusTags = ["Weekly Warrior", "Midweek Machine", "Steady Stride", "Consistency King", "Pace Setter"];
-const weeklySilentTags = ["Silent Climber", "Grinding Ghost", "Steady Storm", "Focused Flare", "Quiet Power"];
-const monthlyFocusTags = ["Monthly Master", "Legend of the Month", "Endurance Elite", "Final Boss", "Peak Performer"];
-const monthlySilentTags = ["Calm Crusher", "Shadow Grinder", "Unseen Achiever", "Silent Champion", "Hustle Hero"];
+const focusTaglines = ["Laser Focus", "Deep Concentration", "Focus Mode", "Zen State", "Study Warrior"];
+const silentTaglines = ["Silent Hustle", "Solo Grind", "Peaceful Push", "Underground Effort", "Hidden Focus"];
 
 const commands = [
   new SlashCommandBuilder()
@@ -114,17 +110,22 @@ client.on('interactionCreate', async interaction => {
     const targetUser = options.getUser('user') || user;
     const data = studyData[targetUser.id] || { camOn: 0, camOff: 0 };
     const total = data.camOn + data.camOff;
-    const focusTag = dailyFocusTags[Math.floor(Math.random() * dailyFocusTags.length)];
-    const silentTag = dailySilentTags[Math.floor(Math.random() * dailySilentTags.length)];
-    const today = new Date().toLocaleDateString('en-IN');
+    const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
+    const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
 
     return interaction.reply(
-      `**📅 ${today} — Study Report for _${targetUser.username}_**
-**📷 Camera On:** **${data.camOn.toFixed(2)} hrs ✅** — _${focusTag}_
-**📷 Camera Off:** **${data.camOff.toFixed(2)} hrs ❌** — _${silentTag}_
+      `**✨ Hey _${targetUser.username}_! Here's your Study Report:**
 
-**🕒 Total Time:** **${total.toFixed(2)} hrs**
-**⚡ Keep going, Champion! You're unstoppable!**`
+` +
+      `**📷 Camera On:** **${data.camOn.toFixed(2)} hrs ✅** — _${focusTag}_
+` +
+      `**📷 Camera Off:** **${data.camOff.toFixed(2)} hrs ❌** — _${silentTag}_
+
+` +
+      `**🕒 Total Time:** **${total.toFixed(2)} hrs**
+
+` +
+      `**⚡ Keep going, Champion! You're unstoppable!**`
     );
   }
 
@@ -147,36 +148,32 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-function leaderboardMessage(type, focusTags, silentTags) {
+function leaderboardMessage(type, limit = 10) {
   const sorted = Object.entries(studyData).sort(([, a], [, b]) =>
     (b.camOn + b.camOff) - (a.camOn + a.camOff)
-  ).slice(0, 10);
-  const today = new Date().toLocaleDateString('en-IN');
+  ).slice(0, limit);
 
-  return `@everyone
-**${type} Leaderboard — ${today}**
+  return `**${type} Leaderboard**
 
 ` + sorted.map(([id, d], i) => {
     const crown = i === 0 ? '👑 ' : '';
-    const focusTag = focusTags[Math.floor(Math.random() * focusTags.length)];
-    const silentTag = silentTags[Math.floor(Math.random() * silentTags.length)];
+    const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
+    const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
     return `${crown}<@${id}>
 📷 Camera On: **${d.camOn.toFixed(1)} hrs ✅** — _${focusTag}_
-📷 Camera Off: **${d.camOff.toFixed(1)} hrs ❌** — _${silentTag}_
-🕒 Total: **${(d.camOn + d.camOff).toFixed(1)} hrs**`;
-  }).join('
-
-');
+📷 Camera Off: **${d.camOff.toFixed(1)} hrs ❌** — _${silentTag}_`;
+  }).join('\n\n');
 }
 
+// Cron Jobs (India Timezone = UTC+5:30)
 cron.schedule('30 18 * * *', () => {
   const ch = client.channels.cache.get(process.env.DAILY_CHANNEL_ID);
-  if (ch) ch.send(leaderboardMessage('Daily', dailyFocusTags, dailySilentTags));
+  if (ch) ch.send(leaderboardMessage('Daily', 10));
 });
 
 cron.schedule('30 18 * * 0', () => {
   const ch = client.channels.cache.get(process.env.WEEKLY_CHANNEL_ID);
-  if (ch) ch.send(leaderboardMessage('Weekly', weeklyFocusTags, weeklySilentTags));
+  if (ch) ch.send(leaderboardMessage('Weekly', 15));
 });
 
 cron.schedule('30 18 28-31 * *', () => {
@@ -184,7 +181,7 @@ cron.schedule('30 18 28-31 * *', () => {
   const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   if (now.getDate() === last) {
     const ch = client.channels.cache.get(process.env.MONTHLY_CHANNEL_ID);
-    if (ch) ch.send(leaderboardMessage('Monthly', monthlyFocusTags, monthlySilentTags));
+    if (ch) ch.send(leaderboardMessage('Monthly', 20));
   }
 });
 
