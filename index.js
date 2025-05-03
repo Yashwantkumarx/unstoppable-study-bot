@@ -14,18 +14,25 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// Data structures for daily, weekly, and monthly tracking
-const dailyData = {};   // Today's data
-const weeklyData = {};  // Current week's data
-const monthlyData = {}; // Current month's data
+// Constants
+const CAMERA_ON_ROOM_ID = '1300572813047894119';
+const DAILY_CHANNEL_ID = '1367618478747680870';
+const WEEKLY_CHANNEL_ID = '1367618555339870208';
+const MONTHLY_CHANNEL_ID = '1367618620460499037';
+
+// Data structures
+const dailyData = {};
+const weeklyData = {};
+const monthlyData = {};
 const studyData = {};
 const cameraStatus = {};
 const userVoiceState = {};
-const CAMERA_ON_ROOM_ID = '1300572813047894119';
 
+// Taglines
 const focusTaglines = ["Laser Focus", "Deep Concentration", "Focus Mode", "Zen State", "Study Warrior"];
 const silentTaglines = ["Silent Hustle", "Solo Grind", "Peaceful Push", "Underground Effort", "Hidden Focus"];
 
+// Slash commands
 const commands = [
   new SlashCommandBuilder()
     .setName('myhours')
@@ -37,36 +44,25 @@ const commands = [
     .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
     .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true))
     .addStringOption(option =>
-      option.setName('type')
-        .setDescription('Camera type')
-        .setRequired(true)
-        .addChoices(
-          { name: 'Camera On', value: 'camOn' },
-          { name: 'Camera Off', value: 'camOff' }
-        )),
+      option.setName('type').setDescription('Camera type').setRequired(true)
+        .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
   new SlashCommandBuilder()
     .setName('removehours')
     .setDescription('Remove hours from a user.')
     .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
     .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true))
     .addStringOption(option =>
-      option.setName('type')
-        .setDescription('Camera type')
-        .setRequired(true)
-        .addChoices(
-          { name: 'Camera On', value: 'camOn' },
-          { name: 'Camera Off', value: 'camOff' }
-        )),
+      option.setName('type').setDescription('Camera type').setRequired(true)
+        .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
   new SlashCommandBuilder()
     .setName('setcamera')
     .setDescription('Set your camera status.')
     .addStringOption(option =>
-      option.setName('status')
-        .setDescription('Camera status')
-        .setRequired(true)
+      option.setName('status').setDescription('Camera status').setRequired(true)
         .addChoices({ name: 'on', value: 'camOn' }, { name: 'off', value: 'camOff' }))
 ];
 
+// Register commands
 client.once('ready', async () => {
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
@@ -75,14 +71,12 @@ client.once('ready', async () => {
   console.log(`Bot is online as ${client.user.tag}`);
 });
 
-// Handle voice state updates
+// Voice tracking
 client.on('voiceStateUpdate', (oldState, newState) => {
   const userId = newState.id;
   const now = Date.now();
 
-  if (!studyData[userId]) {
-    studyData[userId] = { camOn: 0, camOff: 0 };
-  }
+  if (!studyData[userId]) studyData[userId] = { camOn: 0, camOff: 0 };
 
   if (!oldState.channel && newState.channel) {
     const defaultCam = newState.channelId === CAMERA_ON_ROOM_ID ? 'camOn' : 'camOff';
@@ -96,18 +90,15 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     const duration = (now - userVoiceState[userId].startTime) / (1000 * 60 * 60);
     const camType = userVoiceState[userId].camera;
 
-    // Update daily data
     if (!dailyData[userId]) dailyData[userId] = { camOn: 0, camOff: 0 };
     dailyData[userId][camType] += duration;
-
-    // Update studyData for total tracking
     studyData[userId][camType] += duration;
 
     delete userVoiceState[userId];
   }
 });
 
-// Handle interactions (commands)
+// Command handler
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -119,31 +110,26 @@ client.on('interactionCreate', async interaction => {
     return interaction.reply(`Camera status set to: ${status === 'camOn' ? 'ON ✅' : 'OFF ❌'}`);
   }
 
-if (commandName === 'myhours') {
-  const targetUser = options.getUser('user') || user;
-  const data = studyData[targetUser.id] || { camOn: 0, camOff: 0 };
-  const total = data.camOn + data.camOff;
+  if (commandName === 'myhours') {
+    const targetUser = options.getUser('user') || user;
+    const data = dailyData[targetUser.id] || { camOn: 0, camOff: 0 };
+    const total = data.camOn + data.camOff;
 
-  // Get current date in a readable format (e.g., "May 3, 2025")
-  const currentDate = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', // Optional: includes day of the week (e.g., "Monday")
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
 
-  const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
-  const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
+    const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
+    const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
 
-  return interaction.reply(
-    `**✨ Hey _${targetUser.username}_! Here's your Study Report
-      📆 ${currentDate}:**\n` +    
-    `**📷 Camera On:** **${data.camOn.toFixed(2)} hrs ✅** — _${focusTag}_\n` +
-    `**📷 Camera Off:** **${data.camOff.toFixed(2)} hrs ❌** — _${silentTag}_\n` +
-        `**🕒 Total Time:** **${total.toFixed(2)} hrs**\n` +
-        `**⚡ Keep going, Champion! You're unstoppable!**`
-  );
-}
+    return interaction.reply(
+      `**✨ Hey _${targetUser.username}_! Here's your Study Report for ${currentDate}:**\n` +
+      `**📷 Camera On:** **${data.camOn.toFixed(2)} hrs ✅** — _${focusTag}_\n` +
+      `**📷 Camera Off:** **${data.camOff.toFixed(2)} hrs ❌** — _${silentTag}_\n` +
+      `**🕒 Total Time:** **${total.toFixed(2)} hrs**\n` +
+      `**⚡ Keep going, Champion! You're unstoppable!**`
+    );
+  }
 
   if (commandName === 'addhours') {
     const targetUser = options.getUser('user');
@@ -164,43 +150,27 @@ if (commandName === 'myhours') {
   }
 });
 
-// Leaderboard Functions
+// Leaderboard message builder
 function leaderboardMessage(dataType, data) {
   const sorted = Object.entries(data).sort(([, a], [, b]) =>
     (b.camOn + b.camOff) - (a.camOn + a.camOff)
   ).slice(0, 10);
 
-  // Get the current date and calculate the start and end of the current week
   const currentDate = new Date();
   const dayOfWeek = currentDate.getDay();
-  
-  // Calculate the start of the week (Monday)
-  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday (0), move back 6 days
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+
   const startOfWeek = new Date(currentDate);
   startOfWeek.setDate(currentDate.getDate() - daysToMonday);
-  
-  // Calculate the end of the week (Sunday)
-  const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek; // If Sunday (0), stay on that day
+
   const endOfWeek = new Date(currentDate);
   endOfWeek.setDate(currentDate.getDate() + daysToSunday);
 
-  // Format the start and end dates (e.g., "May 1, 2025" to "May 7, 2025")
-  const weekStartDate = startOfWeek.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-
-  const weekEndDate = endOfWeek.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-
-  // Format the current month name (e.g., "May 2025")
+  const weekStartDate = startOfWeek.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const weekEndDate = endOfWeek.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const currentMonth = currentDate.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-  // Determine the leaderboard type and display accordingly
   let leaderboardTitle = '';
   if (dataType === 'Daily') {
     leaderboardTitle = `**Daily Leaderboard for ${currentDate.toLocaleDateString('en-US', {
@@ -218,36 +188,35 @@ function leaderboardMessage(dataType, data) {
   }).join('\n\n');
 }
 
-// Cron Jobs (India Timezone = UTC+5:30)
+// CRON JOBS
 cron.schedule('0 0 * * *', () => {
-  // Reset daily data at midnight
+  const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
+  if (channel) channel.send(leaderboardMessage('Daily', dailyData));
+
   for (const userId in dailyData) {
     if (!weeklyData[userId]) weeklyData[userId] = { camOn: 0, camOff: 0 };
+    if (!monthlyData[userId]) monthlyData[userId] = { camOn: 0, camOff: 0 };
     weeklyData[userId].camOn += dailyData[userId].camOn;
     weeklyData[userId].camOff += dailyData[userId].camOff;
-
-    if (!monthlyData[userId]) monthlyData[userId] = { camOn: 0, camOff: 0 };
     monthlyData[userId].camOn += dailyData[userId].camOn;
     monthlyData[userId].camOff += dailyData[userId].camOff;
-  }
-
-  // Reset daily data
-  for (const userId in dailyData) {
     dailyData[userId] = { camOn: 0, camOff: 0 };
   }
+
   console.log('✅ Daily data has been reset.');
 });
 
 cron.schedule('0 0 * * 0', () => {
-  // Reset weekly data every Sunday
+  const channel = client.channels.cache.get(WEEKLY_CHANNEL_ID);
+  if (channel) channel.send(leaderboardMessage('Weekly', weeklyData));
+
   for (const userId in weeklyData) {
     if (!monthlyData[userId]) monthlyData[userId] = { camOn: 0, camOff: 0 };
     monthlyData[userId].camOn += weeklyData[userId].camOn;
     monthlyData[userId].camOff += weeklyData[userId].camOff;
-  }
-  for (const userId in weeklyData) {
     weeklyData[userId] = { camOn: 0, camOff: 0 };
   }
+
   console.log('✅ Weekly data has been reset.');
 });
 
@@ -255,10 +224,13 @@ cron.schedule('0 0 28-31 * *', () => {
   const now = new Date();
   const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   if (now.getDate() === last) {
-    // Reset monthly data
+    const channel = client.channels.cache.get(MONTHLY_CHANNEL_ID);
+    if (channel) channel.send(leaderboardMessage('Monthly', monthlyData));
+
     for (const userId in monthlyData) {
       monthlyData[userId] = { camOn: 0, camOff: 0 };
     }
+
     console.log('✅ Monthly data has been reset.');
   }
 });
