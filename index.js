@@ -118,11 +118,6 @@ client.on('interactionCreate', async interaction => {
   }
 
   if (commandName === 'addhours' || commandName === 'removehours') {
-    const member = await interaction.guild.members.fetch(user.id);
-    if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      return interaction.reply({ content: 'You are not allowed to use this command.', ephemeral: true });
-    }
-
     const targetUser = options.getUser('user');
     const hours = options.getInteger('hours');
     const type = options.getString('type');
@@ -130,10 +125,18 @@ client.on('interactionCreate', async interaction => {
 
     if (commandName === 'addhours') {
       data.studyData[targetUser.id][type] += hours;
+      // Also update the daily, weekly, and monthly data
+      data.dailyData[targetUser.id][type] += hours;
+      data.weeklyData[targetUser.id][type] += hours;
+      data.monthlyData[targetUser.id][type] += hours;
       saveData();
       return interaction.reply(`Added ${hours} hrs to ${targetUser.username}'s ${type}.`);
     } else {
       data.studyData[targetUser.id][type] = Math.max(0, data.studyData[targetUser.id][type] - hours);
+      // Also update the daily, weekly, and monthly data
+      data.dailyData[targetUser.id][type] = Math.max(0, data.dailyData[targetUser.id][type] - hours);
+      data.weeklyData[targetUser.id][type] = Math.max(0, data.weeklyData[targetUser.id][type] - hours);
+      data.monthlyData[targetUser.id][type] = Math.max(0, data.monthlyData[targetUser.id][type] - hours);
       saveData();
       return interaction.reply(`Removed ${hours} hrs from ${targetUser.username}'s ${type}.`);
     }
