@@ -110,10 +110,10 @@ function generateLeaderboard(title, dataset) {
 
   const now = new Date();
   const label = title === 'Daily'
-    ? now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+    ? now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : title === 'Weekly'
-    ? `Week of ${now.toLocaleDateString('en-US')}`
-    : now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    ? `Week of ${now.toLocaleDateString('en-IN')}`
+    : now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
   let msg = `@everyone\n__**${title} Leaderboard (${label})**__\n**Server: Unstoppable | Owner: Yashwant Kumar**\n`;
   sorted.forEach(([id, h], i) => {
@@ -132,7 +132,7 @@ client.on('interactionCreate', async interaction => {
     const hours = data.dailyData[target.id] || { camOn: 0, camOff: 0 };
     const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
     const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
     const embed = new EmbedBuilder()
       .setTitle(`📊 ${target.username}'s Study Report`)
@@ -204,6 +204,14 @@ cron.schedule('0 0 28-31 * *', () => {
     data.monthlyData = {};
     saveData();
   }
+});
+
+cron.schedule('0 3 * * *', () => {
+  const backupFile = `./backups/data-backup-${new Date().toISOString().split('T')[0]}.json`;
+  fs.copyFile(DATA_FILE, backupFile, err => {
+    if (err) console.error("Backup failed:", err);
+    else console.log("Backup created at:", backupFile);
+  });
 });
 
 client.login(process.env.TOKEN);
