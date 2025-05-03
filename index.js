@@ -119,21 +119,30 @@ client.on('interactionCreate', async interaction => {
     return interaction.reply(`Camera status set to: ${status === 'camOn' ? 'ON ✅' : 'OFF ❌'}`);
   }
 
-  if (commandName === 'myhours') {
-    const targetUser = options.getUser('user') || user;
-    const data = studyData[targetUser.id] || { camOn: 0, camOff: 0 };
-    const total = data.camOn + data.camOff;
-    const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
-    const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
+if (commandName === 'myhours') {
+  const targetUser = options.getUser('user') || user;
+  const data = studyData[targetUser.id] || { camOn: 0, camOff: 0 };
+  const total = data.camOn + data.camOff;
 
-    return interaction.reply(
-      `**✨ Hey _${targetUser.username}_! Here's your Study Report:**\n` +
-      `**📷 Camera On:** **${data.camOn.toFixed(2)} hrs ✅** — _${focusTag}_\n` +
-      `**📷 Camera Off:** **${data.camOff.toFixed(2)} hrs ❌** — _${silentTag}_\n` +
-      `**🕒 Total Time:** **${total.toFixed(2)} hrs**\n` +
-      `**⚡ Keep going, Champion! You're unstoppable!**`
-    );
-  }
+  // Get current date in a readable format (e.g., "May 3, 2025")
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', // Optional: includes day of the week (e.g., "Monday")
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
+  const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
+
+  return interaction.reply(
+    `**✨ Hey _${targetUser.username}_! Here's your Study Report for ${currentDate}:**\n` +
+    `**📷 Camera On:** **${data.camOn.toFixed(2)} hrs ✅** — _${focusTag}_\n` +
+    `**📷 Camera Off:** **${data.camOff.toFixed(2)} hrs ❌** — _${silentTag}_\n` +
+    `**🕒 Total Time:** **${total.toFixed(2)} hrs**\n` +
+    `**⚡ Keep going, Champion! You're unstoppable!**`
+  );
+}
 
   if (commandName === 'addhours') {
     const targetUser = options.getUser('user');
@@ -160,7 +169,34 @@ function leaderboardMessage(dataType, data) {
     (b.camOn + b.camOff) - (a.camOn + a.camOff)
   ).slice(0, 10);
 
-  return `**@everyone**\n**${dataType} Leaderboard**\n\n` + sorted.map(([id, d], i) => {
+  // Get the current date and calculate the start and end of the current week
+  const currentDate = new Date();
+  const dayOfWeek = currentDate.getDay();
+  
+  // Calculate the start of the week (Monday)
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday (0), move back 6 days
+  const startOfWeek = new Date(currentDate);
+  startOfWeek.setDate(currentDate.getDate() - daysToMonday);
+  
+  // Calculate the end of the week (Sunday)
+  const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek; // If Sunday (0), stay on that day
+  const endOfWeek = new Date(currentDate);
+  endOfWeek.setDate(currentDate.getDate() + daysToSunday);
+
+  // Format the start and end dates (e.g., "May 1, 2025" to "May 7, 2025")
+  const weekStartDate = startOfWeek.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const weekEndDate = endOfWeek.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  return `**@everyone**\n**${dataType} Leaderboard for the week from ${weekStartDate} to ${weekEndDate}**\n\n` + sorted.map(([id, d], i) => {
     const crown = i === 0 ? '👑 ' : '';
     return `${crown}<@${id}> 📷 Camera On: **${d.camOn.toFixed(1)} hrs ✅** | 📷 Camera Off: **${d.camOff.toFixed(1)} hrs ❌**`;
   }).join('\n\n');
