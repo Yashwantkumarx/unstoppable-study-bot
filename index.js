@@ -1,3 +1,4 @@
+
 const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Collection } = require('discord.js');
 const cron = require('node-cron');
 const fs = require('fs');
@@ -112,7 +113,7 @@ client.on('interactionCreate', async interaction => {
     if (!data.studyData[user.id]) data.studyData[user.id] = { camOn: 0, camOff: 0 };
     data.studyData[user.id].camera = status;
     saveData();
-    return interaction.reply(`Camera status set to: ${status === 'camOn' ? 'ON ✅' : 'OFF ❌'}`);
+    return interaction.reply(`Camera status set to: ${status === 'camOn' ? 'ON â' : 'OFF â'}`);
   }
 
   if (commandName === 'myhours') {
@@ -126,15 +127,15 @@ client.on('interactionCreate', async interaction => {
     const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
 
     return interaction.reply(
-      `**✨ Hey _${targetUser.username}_! Here's your Study Report for ${currentDate}:**
+      `**â¨ Hey _${targetUser.username}_! Here's your Study Report for ${currentDate}:**
 ` +
-      `**📷 Camera On:** **${dataUser.camOn.toFixed(2)} hrs ✅** — _${focusTag}_
+      `**ð· Camera On:** **${dataUser.camOn.toFixed(2)} hrs â** â _${focusTag}_
 ` +
-      `**📷 Camera Off:** **${dataUser.camOff.toFixed(2)} hrs ❌** — _${silentTag}_
+      `**ð· Camera Off:** **${dataUser.camOff.toFixed(2)} hrs â** â _${silentTag}_
 ` +
-      `**🕒 Total Time:** **${total.toFixed(2)} hrs**
+      `**ð Total Time:** **${total.toFixed(2)} hrs**
 ` +
-      `**⚡ Keep going, Champion! You're unstoppable!**`
+      `**â¡ Keep going, Champion! You're unstoppable!**`
     );
   }
 
