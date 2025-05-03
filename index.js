@@ -113,20 +113,20 @@ client.on('interactionCreate', async interaction => {
     const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
     const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
 
-    return interaction.reply(
-      `**✨ Hey _${targetUser.username}_! Here's your Study Report:**
+const today = new Date().toLocaleDateString('en-IN', {
+  day: '2-digit',
+  month: 'long',
+  year: 'numeric'
+});
 
-` +
-      `**📷 Camera On:** **${data.camOn.toFixed(2)} hrs ✅** — _${focusTag}_
-` +
-      `**📷 Camera Off:** **${data.camOff.toFixed(2)} hrs ❌** — _${silentTag}_
-
-` +
-      `**🕒 Total Time:** **${total.toFixed(2)} hrs**
-
-` +
-      `**⚡ Keep going, Champion! You're unstoppable!**`
-    );
+return interaction.reply(
+  `**✨ Hey _${targetUser.username}_! Here's your Study Report:**\n\n` +
+  `📅 **Date:** ${today}\n\n` +
+  `**📷 Camera On:** **${data.camOn.toFixed(2)} hrs ✅** — _${focusTag}_\n` +
+  `**📷 Camera Off:** **${data.camOff.toFixed(2)} hrs ❌** — _${silentTag}_\n\n` +
+  `**🕒 Total Time:** **${total.toFixed(2)} hrs**\n\n` +
+  `**⚡ Keep going, Champion! You're unstoppable!**`
+);
   }
 
   if (commandName === 'addhours') {
@@ -149,19 +149,42 @@ client.on('interactionCreate', async interaction => {
 });
 
 function leaderboardMessage(type, limit = 10) {
+  const now = new Date();
+
+  let title = `**@everyone**\n**${type} Leaderboard**`;
+
+  if (type === 'Daily') {
+    const date = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+    title += `\n📅 Date: ${date}`;
+  }
+
+  if (type === 'Weekly') {
+    const start = new Date(now);
+    start.setDate(now.getDate() - 6);
+    const startDate = start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    const endDate = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    title += `\n📅 Week: ${startDate} - ${endDate}`;
+  }
+
+  if (type === 'Monthly') {
+    const month = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    title += `\n📅 Month: ${month}`;
+  }
+
   const sorted = Object.entries(studyData).sort(([, a], [, b]) =>
     (b.camOn + b.camOff) - (a.camOn + a.camOff)
   ).slice(0, limit);
 
-  return `**@everyone**\n**${type} Leaderboard**
-
-` + sorted.map(([id, d], i) => {
+  return title + `\n\n` + sorted.map(([id, d], i) => {
     const crown = i === 0 ? '👑 ' : '';
     const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
     const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
+    const total = (d.camOn + d.camOff).toFixed(1);
+
     return `${crown}<@${id}>
 📷 Camera On: **${d.camOn.toFixed(1)} hrs ✅** — _${focusTag}_
-📷 Camera Off: **${d.camOff.toFixed(1)} hrs ❌** — _${silentTag}_`;
+📷 Camera Off: **${d.camOff.toFixed(1)} hrs ❌** — _${silentTag}_
+🕒 Total: **${total} hrs**`;
   }).join('\n\n');
 }
 
