@@ -1,5 +1,4 @@
-
-const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Collection, PermissionsBitField } = require('discord.js');
 const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
@@ -18,7 +17,6 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// Constants
 const CAMERA_ON_ROOM_ID = '1300572813047894119';
 const DAILY_CHANNEL_ID = '1367618478747680870';
 const WEEKLY_CHANNEL_ID = '1367618555339870208';
@@ -50,7 +48,7 @@ const focusTaglines = ["Laser Focus", "Deep Concentration", "Focus Mode", "Zen S
 const silentTaglines = ["Silent Hustle", "Solo Grind", "Peaceful Push", "Underground Effort", "Hidden Focus"];
 
 const commands = [
-  new SlashCommandBuilder().setName('myhours').setDescription('Check study hours.')
+  new SlashCommandBuilder().setName('myhours').setDescription('Check today\'s study hours.')
     .addUserOption(option => option.setName('user').setDescription('User').setRequired(false)),
   new SlashCommandBuilder().setName('addhours').setDescription('Add hours to a user.')
     .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
@@ -89,17 +87,19 @@ client.on('voiceStateUpdate', (oldState, newState) => {
   if (!oldState.channel && newState.channel) {
     const defaultCam = newState.channelId === CAMERA_ON_ROOM_ID ? 'camOn' : 'camOff';
     data.studyData[userId] = {
+      ...data.studyData[userId],
       startTime: now,
       camera: defaultCam
     };
   }
 
-  if (oldState.channel && !newState.channel && data.studyData[userId]) {
+  if (oldState.channel && !newState.channel && data.studyData[userId]?.startTime) {
     const duration = (now - data.studyData[userId].startTime) / (1000 * 60 * 60);
     const camType = data.studyData[userId].camera;
     if (!data.dailyData[userId]) data.dailyData[userId] = { camOn: 0, camOff: 0 };
     data.dailyData[userId][camType] += duration;
     data.studyData[userId][camType] += duration;
+    delete data.studyData[userId].startTime;
     saveData();
   }
 });
@@ -113,7 +113,7 @@ client.on('interactionCreate', async interaction => {
     if (!data.studyData[user.id]) data.studyData[user.id] = { camOn: 0, camOff: 0 };
     data.studyData[user.id].camera = status;
     saveData();
-    return interaction.reply(`Camera status set to: ${status === 'camOn' ? 'ON â' : 'OFF â'}`);
+    return interaction.reply(`Camera status set to: ${status === 'camOn' ? 'ON ✅' : 'OFF ❌'}`);
   }
 
   if (commandName === 'myhours') {
@@ -127,21 +127,17 @@ client.on('interactionCreate', async interaction => {
     const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
 
     return interaction.reply(
-      `**â¨ Hey _${targetUser.username}_! Here's your Study Report for ${currentDate}:**
-` +
-      `**ð· Camera On:** **${dataUser.camOn.toFixed(2)} hrs â** â _${focusTag}_
-` +
-      `**ð· Camera Off:** **${dataUser.camOff.toFixed(2)} hrs â** â _${silentTag}_
-` +
-      `**ð Total Time:** **${total.toFixed(2)} hrs**
-` +
-      `**â¡ Keep going, Champion! You're unstoppable!**`
+      `**✨ Hey _${targetUser.username}_! Here's your Study Report for ${currentDate}:**\n` +
+      `**📷 Camera On:** **${dataUser.camOn.toFixed(2)} hrs ✅** — _${focusTag}_\n` +
+      `**📷 Camera Off:** **${dataUser.camOff.toFixed(2)} hrs ❌** — _${silentTag}_\n` +
+      `**⏱ Total Time:** **${total.toFixed(2)} hrs**\n` +
+      `**⚡ Keep going, Champion! You're unstoppable!**`
     );
   }
 
   if (commandName === 'addhours' || commandName === 'removehours') {
     const member = await interaction.guild.members.fetch(user.id);
-    if (!member.permissions.has('Administrator')) {
+    if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
       return interaction.reply({ content: 'You are not allowed to use this command.', ephemeral: true });
     }
 
@@ -179,50 +175,60 @@ function leaderboardMessage(dataType, data) {
     (b.camOn + b.camOff) - (a.camOn + a.camOff)
   ).slice(0, 10);
 
-  const currentDate = new Date();
-  const dayOfWeek = currentDate.getDay();
-  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  const now = new Date();
+  const header = dataType === 'Daily' ? now.toLocaleDateString('en-US') :
+    dataType === 'Weekly' ? `${getStartOfWeek()} - ${getEndOfWeek()}` :
+    now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  const startOfWeek = new Date(currentDate);
-  startOfWeek.setDate(currentDate.getDate() - daysToMonday);
-  const endOfWeek = new Date(currentDate);
-  endOfWeek.setDate(currentDate.getDate() + daysToSunday);
-
-  const weekStartDate = startOfWeek.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const weekEndDate = endOfWeek.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  let message = `**${dataType} Leaderboard: ${weekStartDate} - ${weekEndDate}**
-`;
+  let message = `@everyone\n**${dataType} Leaderboard: ${header}**\n`;
 
   sorted.forEach(([userId, { camOn, camOff }], index) => {
     const total = camOn + camOff;
-    message += `**#${index + 1}** <@${userId}> - **${total.toFixed(2)} hrs** (Camera On: ${camOn.toFixed(2)} hrs | Camera Off: ${camOff.toFixed(2)} hrs)
-`;
+    message += `**#${index + 1}** <@${userId}> - **${total.toFixed(2)} hrs** (Camera On: ${camOn.toFixed(2)} | Camera Off: ${camOff.toFixed(2)})\n`;
   });
 
   return message;
 }
 
+function getStartOfWeek() {
+  const d = new Date();
+  d.setDate(d.getDate() - d.getDay() + 1);
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
+
+function getEndOfWeek() {
+  const d = new Date();
+  d.setDate(d.getDate() + (7 - d.getDay()));
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
+
 cron.schedule('0 0 * * *', () => {
   const dailyChannel = client.channels.cache.get(DAILY_CHANNEL_ID);
-  const weeklyChannel = client.channels.cache.get(WEEKLY_CHANNEL_ID);
-  const monthlyChannel = client.channels.cache.get(MONTHLY_CHANNEL_ID);
-
-  dailyChannel.send(leaderboardMessage('Daily', data.dailyData));
-  weeklyChannel.send(leaderboardMessage('Weekly', data.weeklyData));
-  monthlyChannel.send(leaderboardMessage('Monthly', data.monthlyData));
-
+  if (dailyChannel) dailyChannel.send(leaderboardMessage('Daily', data.dailyData));
   data.dailyData = {};
   saveData();
-}, null, true, 'America/New_York');
+});
+
+cron.schedule('0 0 * * 1', () => {
+  const weeklyChannel = client.channels.cache.get(WEEKLY_CHANNEL_ID);
+  if (weeklyChannel) weeklyChannel.send(leaderboardMessage('Weekly', data.weeklyData));
+  data.weeklyData = {};
+  saveData();
+});
+
+cron.schedule('0 0 1 * *', () => {
+  const monthlyChannel = client.channels.cache.get(MONTHLY_CHANNEL_ID);
+  if (monthlyChannel) monthlyChannel.send(leaderboardMessage('Monthly', data.monthlyData));
+  data.monthlyData = {};
+  saveData();
+});
 
 cron.schedule('0 1 * * *', () => {
   const date = new Date().toISOString().split('T')[0];
   const backupPath = path.join(__dirname, `data-backup-${date}.json`);
   fs.copyFileSync(DATA_FILE_PATH, backupPath);
   console.log(`Backup saved: ${backupPath}`);
-}, null, true, 'America/New_York');
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
