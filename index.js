@@ -1,4 +1,5 @@
-const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Collection } = require('discord.js');
+// FULL index.js — Real-time Study Tracker Bot with Leaderboards
+const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Collection, PermissionsBitField } = require('discord.js');
 const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
@@ -6,12 +7,7 @@ const express = require('express');
 require('dotenv').config();
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.MessageContent
-  ],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.MessageContent],
   partials: [Partials.Channel]
 });
 
@@ -23,18 +19,13 @@ const WEEKLY_CHANNEL_ID = '1367618555339870208';
 const MONTHLY_CHANNEL_ID = '1367618620460499037';
 const DATA_FILE_PATH = './data.json';
 
-let data = {
-  dailyData: {},
-  weeklyData: {},
-  monthlyData: {},
-  studyData: {}
-};
+let data = { dailyData: {}, weeklyData: {}, monthlyData: {}, studyData: {} };
 
 function loadData() {
   try {
     const fileData = fs.readFileSync(DATA_FILE_PATH, 'utf8');
     data = JSON.parse(fileData);
-  } catch (err) {
+  } catch {
     saveData();
   }
 }
@@ -47,7 +38,7 @@ const focusTaglines = ["Laser Focus", "Deep Concentration", "Focus Mode", "Zen S
 const silentTaglines = ["Silent Hustle", "Solo Grind", "Peaceful Push", "Underground Effort", "Hidden Focus"];
 
 const commands = [
-  new SlashCommandBuilder().setName('myhours').setDescription('Check today\'s study hours.')
+  new SlashCommandBuilder().setName('myhours').setDescription("Check today's study hours.")
     .addUserOption(option => option.setName('user').setDescription('User').setRequired(false)),
   new SlashCommandBuilder().setName('addhours').setDescription('Add hours to a user.')
     .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
@@ -59,7 +50,7 @@ const commands = [
     .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true))
     .addStringOption(option => option.setName('type').setDescription('Camera type').setRequired(true)
       .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
-  new SlashCommandBuilder().setName('setcamera').setDescription('Set camera status (on/off).')
+  new SlashCommandBuilder().setName('setcamera').setDescription('Set camera status.')
     .addStringOption(option => option.setName('status').setDescription('Camera Status').setRequired(true)
       .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' }))
 ];
@@ -71,9 +62,29 @@ client.once('ready', async () => {
   console.log(`Bot is online as ${client.user.tag}`);
 });
 
+function generateLeaderboard(title, dataSet) {
+  const sorted = Object.entries(dataSet).sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff));
+  if (sorted.length === 0) return `No data available for ${title} leaderboard.`;
+
+  const now = new Date();
+  let dateLabel = "";
+  if (title === 'Daily') dateLabel = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  else if (title === 'Weekly') dateLabel = `Week of ${now.toLocaleDateString('en-US')}`;
+  else if (title === 'Monthly') dateLabel = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  let message = `@everyone\n**${title} Leaderboard (${dateLabel})**\n\n`;
+  sorted.forEach(([userId, hours], index) => {
+    const total = hours.camOn + hours.camOff;
+    message += `**#${index + 1}** <@${userId}> — **${total.toFixed(2)} hrs** (✅ ${hours.camOn.toFixed(2)} | ❌ ${hours.camOff.toFixed(2)})\n`;
+  });
+  return message;
+}
+
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
-  const { commandName, user, options } = interaction;
+  const { commandName, user, options, member } = interaction;
+
+  loadData();
 
   if (commandName === 'myhours') {
     const target = options.getUser('user') || user;
@@ -89,92 +100,70 @@ client.on('interactionCreate', async interaction => {
       `**⚡ Keep going, Champion! You're unstoppable!**`);
   }
 
-  if (commandName === 'addhours') {
-    const targetUser = options.getUser('user');
-    const hoursToAdd = options.getInteger('hours');
-    const type = options.getString('type');
-    
-    // Ensure the targetUser's data is initialized
-    if (!data.studyData[targetUser.id]) {
-      data.studyData[targetUser.id] = { camOn: 0, camOff: 0 };
+  if (commandName === 'addhours' || commandName === 'removehours') {
+    if (!member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
+      return interaction.reply({ content: "You don't have permission to use this command.", ephemeral: true });
     }
-    
-    // Update the study data for the user
-    data.studyData[targetUser.id][type] += hoursToAdd;
 
-    // Also update the daily, weekly, and monthly data
+    const targetUser = options.getUser('user');
+    const hoursValue = options.getInteger('hours');
+    const type = options.getString('type');
+    const isAdd = commandName === 'addhours';
+
+    if (!data.studyData[targetUser.id]) data.studyData[targetUser.id] = { camOn: 0, camOff: 0 };
     if (!data.dailyData[targetUser.id]) data.dailyData[targetUser.id] = { camOn: 0, camOff: 0 };
     if (!data.weeklyData[targetUser.id]) data.weeklyData[targetUser.id] = { camOn: 0, camOff: 0 };
     if (!data.monthlyData[targetUser.id]) data.monthlyData[targetUser.id] = { camOn: 0, camOff: 0 };
 
-    data.dailyData[targetUser.id][type] += hoursToAdd;
-    data.weeklyData[targetUser.id][type] += hoursToAdd;
-    data.monthlyData[targetUser.id][type] += hoursToAdd;
-
-    // Save the updated data
-    saveData();
-
-    // Return confirmation
-    return interaction.reply(`Successfully added ${hoursToAdd} hours to ${targetUser.username}'s ${type}.`);
-  }
-
-  if (commandName === 'removehours') {
-    const targetUser = options.getUser('user');
-    const hoursToRemove = options.getInteger('hours');
-    const type = options.getString('type');
-    
-    // Ensure the targetUser's data is initialized
-    if (!data.studyData[targetUser.id]) {
-      data.studyData[targetUser.id] = { camOn: 0, camOff: 0 };
+    if (isAdd) {
+      data.studyData[targetUser.id][type] += hoursValue;
+      data.dailyData[targetUser.id][type] += hoursValue;
+      data.weeklyData[targetUser.id][type] += hoursValue;
+      data.monthlyData[targetUser.id][type] += hoursValue;
+    } else {
+      data.studyData[targetUser.id][type] = Math.max(0, data.studyData[targetUser.id][type] - hoursValue);
+      data.dailyData[targetUser.id][type] = Math.max(0, data.dailyData[targetUser.id][type] - hoursValue);
+      data.weeklyData[targetUser.id][type] = Math.max(0, data.weeklyData[targetUser.id][type] - hoursValue);
+      data.monthlyData[targetUser.id][type] = Math.max(0, data.monthlyData[targetUser.id][type] - hoursValue);
     }
-    
-    // Remove the hours and prevent going negative
-    data.studyData[targetUser.id][type] = Math.max(0, data.studyData[targetUser.id][type] - hoursToRemove);
 
-    // Also update the daily, weekly, and monthly data
-    data.dailyData[targetUser.id][type] = Math.max(0, data.dailyData[targetUser.id][type] - hoursToRemove);
-    data.weeklyData[targetUser.id][type] = Math.max(0, data.weeklyData[targetUser.id][type] - hoursToRemove);
-    data.monthlyData[targetUser.id][type] = Math.max(0, data.monthlyData[targetUser.id][type] - hoursToRemove);
-
-    // Save the updated data
     saveData();
-
-    // Return confirmation
-    return interaction.reply(`Successfully removed ${hoursToRemove} hours from ${targetUser.username}'s ${type}.`);
+    return interaction.reply(`Successfully ${isAdd ? 'added' : 'removed'} ${hoursValue} hours ${isAdd ? 'to' : 'from'} ${targetUser.username}'s ${type}.`);
   }
 
   if (commandName === 'setcamera') {
     const status = options.getString('status');
-    const currentStatus = data.studyData[user.id] ? data.studyData[user.id].camera : null;
-    if (currentStatus !== status) {
-      data.studyData[user.id].camera = status;
-      saveData();
-      return interaction.reply(`Your camera has been set to **${status === 'camOn' ? 'On' : 'Off'}**.`);
-    }
-    return interaction.reply('Your camera status is already set to this.');
+    if (!data.studyData[user.id]) data.studyData[user.id] = { camOn: 0, camOff: 0, camera: status };
+    else data.studyData[user.id].camera = status;
+
+    saveData();
+    return interaction.reply(`Your camera has been set to **${status === 'camOn' ? 'On' : 'Off'}**.`);
   }
 });
 
-// Reset & Post Leaderboards
+// Scheduled Leaderboards
 cron.schedule('59 23 * * *', () => {
-  const dailyChannel = client.channels.cache.get(DAILY_CHANNEL_ID);
-  dailyChannel.send(generateLeaderboard('Daily', data.dailyData));
+  const channel = client.channels.cache.get(DAILY_CHANNEL_ID);
+  channel?.send(generateLeaderboard('Daily', data.dailyData));
   data.dailyData = {};
   saveData();
 });
 
 cron.schedule('59 23 * * 0', () => {
-  const weeklyChannel = client.channels.cache.get(WEEKLY_CHANNEL_ID);
-  weeklyChannel.send(generateLeaderboard('Weekly', data.weeklyData));
+  const channel = client.channels.cache.get(WEEKLY_CHANNEL_ID);
+  channel?.send(generateLeaderboard('Weekly', data.weeklyData));
   data.weeklyData = {};
   saveData();
 });
 
-cron.schedule('59 23 30 * *', () => {
-  const monthlyChannel = client.channels.cache.get(MONTHLY_CHANNEL_ID);
-  monthlyChannel.send(generateLeaderboard('Monthly', data.monthlyData));
-  data.monthlyData = {};
-  saveData();
+cron.schedule('59 23 28-31 * *', () => {
+  const now = new Date();
+  if (now.getDate() === new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()) {
+    const channel = client.channels.cache.get(MONTHLY_CHANNEL_ID);
+    channel?.send(generateLeaderboard('Monthly', data.monthlyData));
+    data.monthlyData = {};
+    saveData();
+  }
 });
 
 // Auto-backup
@@ -183,13 +172,14 @@ cron.schedule('0 1 * * *', () => {
   fs.copyFileSync(DATA_FILE_PATH, path.join(__dirname, `data-backup-${date}.json`));
 });
 
-// Dashboard API
+// Dashboard
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/leaderboard/:type', (req, res) => {
+  loadData();
   const type = req.params.type;
-  const dataset = type === 'daily' ? data.dailyData : type === 'weekly' ? data.weeklyData : data.monthlyData;
+  const dataset = type === 'daily' ? data.dailyData : type === 'weekly' ? data.weeklyData : type === 'monthly' ? data.monthlyData : null;
   if (!dataset) return res.status(400).send('Invalid leaderboard type.');
 
   const sorted = Object.entries(dataset).sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff))
@@ -204,6 +194,6 @@ app.get('/leaderboard/:type', (req, res) => {
   res.json(sorted);
 });
 
-app.listen(PORT, () => console.log(`Dashboard running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Dashboard running at http://localhost:${PORT}`));
 
 client.login(process.env.TOKEN);
