@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Collection, PermissionsBitField } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Collection } = require('discord.js');
 const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
@@ -59,11 +59,9 @@ const commands = [
     .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true))
     .addStringOption(option => option.setName('type').setDescription('Camera type').setRequired(true)
       .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
-  new SlashCommandBuilder().setName('leaderboard').setDescription('View the leaderboard.')
-    .addStringOption(option => option.setName('type').setDescription('Type').setRequired(true)
-      .addChoices({ name: 'Daily', value: 'daily' }, { name: 'Weekly', value: 'weekly' }, { name: 'Monthly', value: 'monthly' })),
-  new SlashCommandBuilder().setName('totalhours').setDescription('View total hours for a user.')
-    .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
+  new SlashCommandBuilder().setName('setcamera').setDescription('Set camera status (on/off).')
+    .addStringOption(option => option.setName('status').setDescription('Camera Status').setRequired(true)
+      .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' }))
 ];
 
 client.once('ready', async () => {
@@ -142,30 +140,17 @@ client.on('interactionCreate', async interaction => {
     }
   }
 
-  if (commandName === 'leaderboard') {
-    const type = options.getString('type');
-    const dataSet = type === 'daily' ? data.dailyData : type === 'weekly' ? data.weeklyData : data.monthlyData;
-    const label = type.charAt(0).toUpperCase() + type.slice(1);
-    return interaction.reply({ content: generateLeaderboard(label, dataSet) });
-  }
-
-  if (commandName === 'totalhours') {
-    const targetUser = options.getUser('user');
-    const userData = data.studyData[targetUser.id] || { camOn: 0, camOff: 0 };
-    const total = userData.camOn + userData.camOff;
-    return interaction.reply(`**${targetUser.username}** has a total of **${total.toFixed(2)} hrs**.`);
+  if (commandName === 'setcamera') {
+    const status = options.getString('status');
+    const currentStatus = data.studyData[user.id] ? data.studyData[user.id].camera : null;
+    if (currentStatus !== status) {
+      data.studyData[user.id].camera = status;
+      saveData();
+      return interaction.reply(`Your camera has been set to **${status === 'camOn' ? 'On' : 'Off'}**.`);
+    }
+    return interaction.reply('Your camera status is already set to this.');
   }
 });
-
-function generateLeaderboard(type, dataset) {
-  const sorted = Object.entries(dataset).sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff));
-  let header = `@everyone\n**${type} Leaderboard (${new Date().toLocaleDateString('en-US')})**\n\n`;
-  sorted.forEach(([id, { camOn, camOff }], i) => {
-    const total = camOn + camOff;
-    header += `**#${i + 1}** <@${id}> - **${total.toFixed(2)} hrs** (Camera On: ${camOn.toFixed(2)} | Camera Off: ${camOff.toFixed(2)})\n`;
-  });
-  return header;
-}
 
 // Reset & Post Leaderboards
 cron.schedule('59 23 * * *', () => {
