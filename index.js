@@ -24,7 +24,7 @@ const MONTHLY_CHANNEL_ID = '1367618620460499037';
 // Data file path
 const DATA_FILE_PATH = './data.json';
 
-// Data structures (loaded from file)
+// Data structures
 let data = {
   dailyData: {},
   weeklyData: {},
@@ -39,7 +39,7 @@ function loadData() {
     data = JSON.parse(fileData);
   } catch (err) {
     console.log('No data file found, initializing new data structure.');
-    saveData(); // Save the initial structure if no file exists
+    saveData();
   }
 }
 
@@ -54,43 +54,20 @@ const silentTaglines = ["Silent Hustle", "Solo Grind", "Peaceful Push", "Undergr
 
 // Slash commands
 const commands = [
-  new SlashCommandBuilder()
-    .setName('myhours')
-    .setDescription('Check study hours.')
-    .addUserOption(option => option.setName('user').setDescription('User').setRequired(false)),
-  new SlashCommandBuilder()
-    .setName('addhours')
-    .setDescription('Add hours to a user.')
+  new SlashCommandBuilder().setName('myhours').setDescription('Check study hours.').addUserOption(option => option.setName('user').setDescription('User').setRequired(false)),
+  new SlashCommandBuilder().setName('addhours').setDescription('Add hours to a user.')
     .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
     .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true))
-    .addStringOption(option =>
-      option.setName('type').setDescription('Camera type').setRequired(true)
-        .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
-  new SlashCommandBuilder()
-    .setName('removehours')
-    .setDescription('Remove hours from a user.')
+    .addStringOption(option => option.setName('type').setDescription('Camera type').setRequired(true).addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
+  new SlashCommandBuilder().setName('removehours').setDescription('Remove hours from a user.')
     .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
     .addIntegerOption(option => option.setName('hours').setDescription('Hours').setRequired(true))
-    .addStringOption(option =>
-      option.setName('type').setDescription('Camera type').setRequired(true)
-        .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
-  new SlashCommandBuilder()
-    .setName('setcamera')
-    .setDescription('Set your camera status.')
-    .addStringOption(option =>
-      option.setName('status').setDescription('Camera status').setRequired(true)
-        .addChoices({ name: 'on', value: 'camOn' }, { name: 'off', value: 'camOff' })),
-  new SlashCommandBuilder()
-    .setName('leaderboard')
-    .setDescription('View the leaderboard')
-    .addStringOption(option =>
-      option.setName('type')
-        .setDescription('Leaderboard type')
-        .setRequired(true)
-        .addChoices({ name: 'Daily', value: 'daily' }, { name: 'Weekly', value: 'weekly' }, { name: 'Monthly', value: 'monthly' })),
-  new SlashCommandBuilder()
-    .setName('totalhours')
-    .setDescription('View total hours for a user.')
+    .addStringOption(option => option.setName('type').setDescription('Camera type').setRequired(true).addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
+  new SlashCommandBuilder().setName('setcamera').setDescription('Set your camera status.')
+    .addStringOption(option => option.setName('status').setDescription('Camera status').setRequired(true).addChoices({ name: 'on', value: 'camOn' }, { name: 'off', value: 'camOff' })),
+  new SlashCommandBuilder().setName('leaderboard').setDescription('View the leaderboard')
+    .addStringOption(option => option.setName('type').setDescription('Leaderboard type').setRequired(true).addChoices({ name: 'Daily', value: 'daily' }, { name: 'Weekly', value: 'weekly' }, { name: 'Monthly', value: 'monthly' })),
+  new SlashCommandBuilder().setName('totalhours').setDescription('View total hours for a user.')
     .addUserOption(option => option.setName('user').setDescription('User').setRequired(true))
 ];
 
@@ -106,20 +83,18 @@ client.once('ready', async () => {
 
 // Voice tracking
 client.on('voiceStateUpdate', (oldState, newState) => {
-  const userId = newState.id;
+  const userId = oldState.id;
   const now = Date.now();
 
   if (!data.studyData[userId]) data.studyData[userId] = { camOn: 0, camOff: 0 };
 
   if (!oldState.channel && newState.channel) {
     const defaultCam = newState.channelId === CAMERA_ON_ROOM_ID ? 'camOn' : 'camOff';
-    data.studyData[userId] = {
-      startTime: now,
-      camera: defaultCam
-    };
+    data.studyData[userId].startTime = now;
+    data.studyData[userId].camera = defaultCam;
   }
 
-  if (oldState.channel && !newState.channel && data.studyData[userId]) {
+  if (oldState.channel && !newState.channel && data.studyData[userId]?.startTime) {
     const duration = (now - data.studyData[userId].startTime) / (1000 * 60 * 60);
     const camType = data.studyData[userId].camera;
 
@@ -127,11 +102,13 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     data.dailyData[userId][camType] += duration;
     data.studyData[userId][camType] += duration;
 
-    saveData(); // Save after every update
+    delete data.studyData[userId].startTime;
+
+    saveData();
   }
 });
 
-// Command handler
+// Commands
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -139,6 +116,7 @@ client.on('interactionCreate', async interaction => {
 
   if (commandName === 'setcamera') {
     const status = options.getString('status');
+    if (!data.studyData[user.id]) data.studyData[user.id] = { camOn: 0, camOff: 0 };
     data.studyData[user.id].camera = status;
     saveData();
     return interaction.reply(`Camera status set to: ${status === 'camOn' ? 'ON ✅' : 'OFF ❌'}`);
@@ -206,48 +184,66 @@ function leaderboardMessage(dataType, data) {
   ).slice(0, 10);
 
   const currentDate = new Date();
-  const dayOfWeek = currentDate.getDay();
-  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const daysToSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  const weekStartDate = new Date(currentDate);
+  weekStartDate.setDate(currentDate.getDate() - currentDate.getDay());
+  const weekEndDate = new Date(currentDate);
+  weekEndDate.setDate(weekStartDate.getDate() + 6);
 
-  const startOfWeek = new Date(currentDate);
-  startOfWeek.setDate(currentDate.getDate() - daysToMonday);
+  const header =
+    dataType === 'Daily' ? `**Daily Leaderboard: ${currentDate.toDateString()}**` :
+    dataType === 'Weekly' ? `**Weekly Leaderboard: ${weekStartDate.toDateString()} - ${weekEndDate.toDateString()}**` :
+    `**Monthly Leaderboard: ${currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}**`;
 
-  const endOfWeek = new Date(currentDate);
-  endOfWeek.setDate(currentDate.getDate() + daysToSunday);
-
-  const weekStartDate = startOfWeek.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const weekEndDate = endOfWeek.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  const message = `**${dataType} Leaderboard: ${weekStartDate} - ${weekEndDate}**\n`;
+  let message = `${header}\n`;
 
   sorted.forEach(([userId, { camOn, camOff }], index) => {
     const total = camOn + camOff;
     message += `**#${index + 1}** <@${userId}> - **${total.toFixed(2)} hrs** (Camera On: ${camOn.toFixed(2)} hrs | Camera Off: ${camOff.toFixed(2)} hrs)\n`;
   });
 
-  return message;
+  return `@everyone\n${message}`;
 }
 
-// Periodic leaderboard posting
+// Post and reset daily leaderboard
 cron.schedule('0 0 * * *', () => {
   const dailyChannel = client.channels.cache.get(DAILY_CHANNEL_ID);
   const weeklyChannel = client.channels.cache.get(WEEKLY_CHANNEL_ID);
   const monthlyChannel = client.channels.cache.get(MONTHLY_CHANNEL_ID);
 
-  // Send daily leaderboard
-  dailyChannel.send(leaderboardMessage('Daily', data.dailyData));
+  // Post leaderboards
+  dailyChannel?.send(leaderboardMessage('Daily', data.dailyData));
+  weeklyChannel?.send(leaderboardMessage('Weekly', data.weeklyData));
+  monthlyChannel?.send(leaderboardMessage('Monthly', data.monthlyData));
 
-  // Send weekly leaderboard
-  weeklyChannel.send(leaderboardMessage('Weekly', data.weeklyData));
+  // Update weekly & monthly data
+  for (const userId in data.dailyData) {
+    const { camOn, camOff } = data.dailyData[userId];
 
-  // Send monthly leaderboard
-  monthlyChannel.send(leaderboardMessage('Monthly', data.monthlyData));
+    if (!data.weeklyData[userId]) data.weeklyData[userId] = { camOn: 0, camOff: 0 };
+    data.weeklyData[userId].camOn += camOn;
+    data.weeklyData[userId].camOff += camOff;
 
-  // Reset data at midnight
+    if (!data.monthlyData[userId]) data.monthlyData[userId] = { camOn: 0, camOff: 0 };
+    data.monthlyData[userId].camOn += camOn;
+    data.monthlyData[userId].camOff += camOff;
+  }
+
+  // Reset daily data
   data.dailyData = {};
   saveData();
 }, null, true, 'America/New_York');
 
-// Client login
+// Reset weekly
+cron.schedule('0 0 * * 1', () => {
+  data.weeklyData = {};
+  saveData();
+}, null, true, 'America/New_York');
+
+// Reset monthly
+cron.schedule('0 0 1 * *', () => {
+  data.monthlyData = {};
+  saveData();
+}, null, true, 'America/New_York');
+
+// Login
 client.login(process.env.TOKEN);
