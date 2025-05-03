@@ -153,7 +153,7 @@ function leaderboardMessage(type, limit = 10) {
     (b.camOn + b.camOff) - (a.camOn + a.camOff)
   ).slice(0, limit);
 
-  return `**${type} Leaderboard**
+  return `**@everyone**\n**${type} Leaderboard**
 
 ` + sorted.map(([id, d], i) => {
     const crown = i === 0 ? '👑 ' : '';
