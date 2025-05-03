@@ -14,6 +14,10 @@ const client = new Client({
 
 client.commands = new Collection();
 
+// Data structures for daily, weekly, and monthly tracking
+const dailyData = {};   // Today's data
+const weeklyData = {};  // Current week's data
+const monthlyData = {}; // Current month's data
 const studyData = {};
 const cameraStatus = {};
 const userVoiceState = {};
@@ -71,6 +75,7 @@ client.once('ready', async () => {
   console.log(`Bot is online as ${client.user.tag}`);
 });
 
+// Handle voice state updates
 client.on('voiceStateUpdate', (oldState, newState) => {
   const userId = newState.id;
   const now = Date.now();
@@ -90,11 +95,19 @@ client.on('voiceStateUpdate', (oldState, newState) => {
   if (oldState.channel && !newState.channel && userVoiceState[userId]) {
     const duration = (now - userVoiceState[userId].startTime) / (1000 * 60 * 60);
     const camType = userVoiceState[userId].camera;
+
+    // Update daily data
+    if (!dailyData[userId]) dailyData[userId] = { camOn: 0, camOff: 0 };
+    dailyData[userId][camType] += duration;
+
+    // Update studyData for total tracking
     studyData[userId][camType] += duration;
+
     delete userVoiceState[userId];
   }
 });
 
+// Handle interactions (commands)
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -113,20 +126,13 @@ client.on('interactionCreate', async interaction => {
     const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
     const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
 
-const today = new Date().toLocaleDateString('en-IN', {
-  day: '2-digit',
-  month: 'long',
-  year: 'numeric'
-});
-
-return interaction.reply(
-  `**✨ Hey _${targetUser.username}_! Here's your Study Report:**\n\n` +
-  `📅 **Date:** ${today}\n\n` +
-  `**📷 Camera On:** **${data.camOn.toFixed(2)} hrs ✅** — _${focusTag}_\n` +
-  `**📷 Camera Off:** **${data.camOff.toFixed(2)} hrs ❌** — _${silentTag}_\n\n` +
-  `**🕒 Total Time:** **${total.toFixed(2)} hrs**\n\n` +
-  `**⚡ Keep going, Champion! You're unstoppable!**`
-);
+    return interaction.reply(
+      `**✨ Hey _${targetUser.username}_! Here's your Study Report:**\n` +
+      `**📷 Camera On:** **${data.camOn.toFixed(2)} hrs ✅** — _${focusTag}_\n` +
+      `**📷 Camera Off:** **${data.camOff.toFixed(2)} hrs ❌** — _${silentTag}_\n` +
+      `**🕒 Total Time:** **${total.toFixed(2)} hrs**\n` +
+      `**⚡ Keep going, Champion! You're unstoppable!**`
+    );
   }
 
   if (commandName === 'addhours') {
@@ -148,63 +154,60 @@ return interaction.reply(
   }
 });
 
-function leaderboardMessage(type, limit = 10) {
-  const now = new Date();
-
-  let title = `**@everyone**\n**${type} Leaderboard**`;
-
-  if (type === 'Daily') {
-    const date = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
-    title += `\n📅 Date: ${date}`;
-  }
-
-  if (type === 'Weekly') {
-    const start = new Date(now);
-    start.setDate(now.getDate() - 6);
-    const startDate = start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-    const endDate = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-    title += `\n📅 Week: ${startDate} - ${endDate}`;
-  }
-
-  if (type === 'Monthly') {
-    const month = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-    title += `\n📅 Month: ${month}`;
-  }
-
-  const sorted = Object.entries(studyData).sort(([, a], [, b]) =>
+// Leaderboard Functions
+function leaderboardMessage(dataType, data) {
+  const sorted = Object.entries(data).sort(([, a], [, b]) =>
     (b.camOn + b.camOff) - (a.camOn + a.camOff)
-  ).slice(0, limit);
+  ).slice(0, 10);
 
-  return title + `\n\n` + sorted.map(([id, d], i) => {
+  return `**@everyone**\n**${dataType} Leaderboard**\n\n` + sorted.map(([id, d], i) => {
     const crown = i === 0 ? '👑 ' : '';
-    const focusTag = focusTaglines[Math.floor(Math.random() * focusTaglines.length)];
-    const silentTag = silentTaglines[Math.floor(Math.random() * silentTaglines.length)];
-    const total = (d.camOn + d.camOff).toFixed(1);
-
-    return `${crown}<@${id}>
-📷 Camera On: **${d.camOn.toFixed(1)} hrs ✅** — _${focusTag}_
-📷 Camera Off: **${d.camOff.toFixed(1)} hrs ❌** — _${silentTag}_
-🕒 Total: **${total} hrs**`;
+    return `${crown}<@${id}> 📷 Camera On: **${d.camOn.toFixed(1)} hrs ✅** | 📷 Camera Off: **${d.camOff.toFixed(1)} hrs ❌**`;
   }).join('\n\n');
 }
 
 // Cron Jobs (India Timezone = UTC+5:30)
-cron.schedule('30 18 * * *', () => {
-  const ch = client.channels.cache.get(process.env.DAILY_CHANNEL_ID);
-  if (ch) ch.send(leaderboardMessage('Daily', 10));
+cron.schedule('0 0 * * *', () => {
+  // Reset daily data at midnight
+  for (const userId in dailyData) {
+    if (!weeklyData[userId]) weeklyData[userId] = { camOn: 0, camOff: 0 };
+    weeklyData[userId].camOn += dailyData[userId].camOn;
+    weeklyData[userId].camOff += dailyData[userId].camOff;
+
+    if (!monthlyData[userId]) monthlyData[userId] = { camOn: 0, camOff: 0 };
+    monthlyData[userId].camOn += dailyData[userId].camOn;
+    monthlyData[userId].camOff += dailyData[userId].camOff;
+  }
+
+  // Reset daily data
+  for (const userId in dailyData) {
+    dailyData[userId] = { camOn: 0, camOff: 0 };
+  }
+  console.log('✅ Daily data has been reset.');
 });
 
-cron.schedule('30 18 * * 0', () => {
-  const ch = client.channels.cache.get(process.env.WEEKLY_CHANNEL_ID);
-  if (ch) ch.send(leaderboardMessage('Weekly', 15));
+cron.schedule('0 0 * * 0', () => {
+  // Reset weekly data every Sunday
+  for (const userId in weeklyData) {
+    if (!monthlyData[userId]) monthlyData[userId] = { camOn: 0, camOff: 0 };
+    monthlyData[userId].camOn += weeklyData[userId].camOn;
+    monthlyData[userId].camOff += weeklyData[userId].camOff;
+  }
+  for (const userId in weeklyData) {
+    weeklyData[userId] = { camOn: 0, camOff: 0 };
+  }
+  console.log('✅ Weekly data has been reset.');
 });
 
-cron.schedule('30 18 28-31 * *', () => {
+cron.schedule('0 0 28-31 * *', () => {
   const now = new Date();
   const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   if (now.getDate() === last) {
-    const ch = client.channels.cache.get(process.env.MONTHLY_CHANNEL_ID);
-    if (ch) ch.send(leaderboardMessage('Monthly', 20));
+    // Reset monthly data
+    for (const userId in monthlyData) {
+      monthlyData[userId] = { camOn: 0, camOff: 0 };
+    }
+    console.log('✅ Monthly data has been reset.');
   }
 });
 
