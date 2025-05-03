@@ -1,4 +1,3 @@
-
 const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Collection } = require('discord.js');
 const cron = require('node-cron');
 require('dotenv').config();
