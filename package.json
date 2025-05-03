@@ -1,13 +1,16 @@
 {
-  "name": "study-leaderboard-bot",
+  "name": "unstoppable-study-bot",
   "version": "1.0.0",
+  "description": "Study tracker Discord bot",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.11.0",
     "dotenv": "^16.3.1",
+    "express": "^4.18.2",
     "node-cron": "^3.0.2"
   }
 }
