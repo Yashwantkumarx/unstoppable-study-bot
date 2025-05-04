@@ -265,7 +265,7 @@ client.on('interactionCreate', async interaction => {
     }
 
     const dateRange = getISTDateLabel(title);
-    const embed = generateLeaderboardEmbed(title, dataset, dateRange);
+    const embed = generateMultiLeaderboardEmbed(title, dataset);
     return interaction.reply({ embeds: [embed] });
   }
 });
