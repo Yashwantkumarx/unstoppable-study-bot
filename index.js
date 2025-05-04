@@ -128,13 +128,15 @@ function getISTDateLabel(title) {
   }
 }
 
-function generateLeaderboardEmbed(title, dataset, dateRange) {
+function generateLeaderboardEmbed(title, dataset) {
   const sorted = Object.entries(dataset)
     .sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff))
     .slice(0, 10);
 
+  const label = getISTDateLabel(title);
+
   const embed = new EmbedBuilder()
-    .setTitle(`📋 ${title} Leaderboard — ${dateRange}`)
+    .setTitle(`📋 ${title} Leaderboard — ${label}`)
     .setDescription(`**Server: Unstoppable | Owner: Yashwant Kumar**`)
     .setColor(0x00bfff)
     .setFooter({ text: 'Top 10 Students Hustling!' });
@@ -145,14 +147,17 @@ function generateLeaderboardEmbed(title, dataset, dateRange) {
     sorted.forEach(([id, h], i) => {
       embed.addFields({
         name: `#${i + 1} — <@${id}>`,
-        value: `✅ ${formatTime(h.camOn)} | ❌ ${formatTime(h.camOff)}\n**Total: ${formatTime(h.camOn + h.camOff)}**`
+        value: `
+          🟢 **Camera On:** ${formatTime(h.camOn)}  
+          🔴 **Camera Off:** ${formatTime(h.camOff)}  
+          **Total:** ${formatTime(h.camOn + h.camOff)}
+        `
       });
     });
   }
 
   return embed;
 }
-
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
   const { commandName, user, options, member } = interaction;
