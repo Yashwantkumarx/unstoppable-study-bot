@@ -245,6 +245,33 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
+// Track active voice users every minute
+cron.schedule('* * * * *', () => {
+  const now = Date.now();
+
+  for (const userId in joinTimestamps) {
+    const startTime = joinTimestamps[userId];
+    const durationMs = now - startTime;
+    const durationMin = durationMs / 60000;
+
+    if (durationMin >= 1) {
+      const member = client.guilds.cache.first()?.members.cache.get(userId);
+      if (!member?.voice.channelId) continue;
+
+      const camType = CAMERA_ON_ROOM_IDS.includes(member.voice.channelId) ? 'camOn' : 'camOff';
+
+      for (const dataset of [data.studyData, data.dailyData, data.weeklyData, data.monthlyData]) {
+        if (!dataset[userId]) dataset[userId] = { camOn: 0, camOff: 0 };
+        dataset[userId][camType] += 1 / 60;
+      }
+
+      joinTimestamps[userId] = now;
+    }
+  }
+
+  saveData();
+});
+
 // Auto leaderboard + reset
 
 cron.schedule('0 0 * * *', () => {
