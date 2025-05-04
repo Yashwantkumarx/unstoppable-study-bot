@@ -96,16 +96,35 @@ function formatTime(hr) {
 }
 
 function getISTDateLabel(title) {
-  const date = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-  const dt = new Date(date);
+  const now = new Date();
+
+  const formatter = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const formattedDate = formatter.format(now);
 
   if (title === 'Daily') {
-    return dt.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const weekday = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      weekday: 'long',
+    }).format(now);
+    return `${weekday}, ${formattedDate}`;
   } else if (title === 'Weekly') {
-    const startOfWeek = new Date(dt.setDate(dt.getDate() - dt.getDay())); // Start of the week (Sunday)
-    return `${startOfWeek.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} - ${dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    const weekStart = new Date(now);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday as start
+    const start = formatter.format(weekStart);
+    return `Week: ${start} → ${formattedDate}`;
   } else {
-    return dt.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    const month = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      month: 'long',
+      year: 'numeric',
+    }).format(now);
+    return `Month: ${month}`;
   }
 }
 
