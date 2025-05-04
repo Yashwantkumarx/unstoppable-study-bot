@@ -229,23 +229,11 @@ cron.schedule('0 0 * * 0', () => {
   saveData();
 });
 
-cron.schedule('0 0 28-31 * *', () => {
-  const today = new Date();
-  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  if (today.getDate() === lastDay) {
-    const ch = client.channels.cache.get(MONTHLY_CHANNEL_ID);
-    ch?.send({ embeds: [generateLeaderboardEmbed('Monthly', data.monthlyData)] });
-    data.monthlyData = {};
-    saveData();
-  }
-});
-
-cron.schedule('0 3 * * *', () => {
-  const backupFile = `./backups/data-backup-${new Date().toISOString().split('T')[0]}.json`;
-  fs.copyFile(DATA_FILE, backupFile, err => {
-    if (err) console.error("Backup failed:", err);
-    else console.log("Backup created at:", backupFile);
-  });
+cron.schedule('0 0 1 * *', () => {
+  const ch = client.channels.cache.get(MONTHLY_CHANNEL_ID);
+  ch?.send({ embeds: [generateLeaderboardEmbed('Monthly', data.monthlyData)] });
+  data.monthlyData = {};
+  saveData();
 });
 
 client.login(process.env.TOKEN);
