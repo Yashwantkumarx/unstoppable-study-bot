@@ -150,33 +150,30 @@ function generateLeaderboardEmbed(title, dataset) {
 
   const label = getISTDateLabel(title);
 
-  const colorMap = {
-    'Daily': 0x00bfff,
-    'Weekly': 0x9b59b6,
-    'Monthly': 0xf1c40f
-  };
-
   const embed = new EmbedBuilder()
-    .setTitle(`🏆 ${title} Leaderboard — ${label}`)
-    .setDescription(`**Server:** Unstoppable\n**Owner:** Yashwant Kumar`)
-    .setColor(colorMap[title] || 0x00bfff)
-    .setFooter({ text: 'Top 10 Students Hustling!' });
+    .setTitle(`📋 ${title} Leaderboard — ${label}`)
+    .setDescription(`**Server: Unstoppable | Owner: Yashwant Kumar**`)
+    .setColor(0x00bfff)
+    .setFooter({ text: 'Top 10 Students Hustling! Keep climbing. Stay Unstoppable.' });
 
   if (sorted.length === 0) {
-    embed.addFields({
-      name: "No data yet!",
-      value: "Start your grind today to appear on the leaderboard!"
-    });
+    embed.addFields({ name: "No data available", value: "Start studying to appear on the leaderboard!" });
   } else {
-    sorted.forEach(([id, h], i) => {
-      const total = h.camOn + h.camOff;
-      embed.addFields({
-        name: `#${i + 1} — <@${id}>`,
-        value:
-          `**🟢 Camera On:** \`${formatTime(h.camOn)}\`  |  **❌ Camera Off:** \`${formatTime(h.camOff)}\`\n` +
-          `**⏳ Total:** \`${formatTime(total)}\``,
-        inline: false
-      });
+    embed.addFields({
+      name: `🏆 Top 10 Hustlers`,
+      value: sorted.map(([id, h], i) => {
+        const total = h.camOn + h.camOff;
+        const rank = `#${i + 1}`.padEnd(4);
+
+        return (
+`╔═══════ ${rank} ═══════╗
+**👤 User:** <@${id}>
+📸 Camera On : \`${formatTime(h.camOn)}\`
+🔇 Camera Off: \`${formatTime(h.camOff)}\`
+⏳ Total Time: \`${formatTime(total)}\`
+╚════════════════════╝`
+        );
+      }).join('\n\n')
     });
   }
 
