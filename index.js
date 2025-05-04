@@ -15,14 +15,7 @@ const client = new Client({
 
 client.commands = new Collection();
 
-const CAMERA_ON_ROOM_IDS = [
-  '1300572813047894119',
-  '1228945365764669531',
-  '1228946332111077447',
-  '1298580693668069476',
-  '1309111502757953557'
-];
-
+const CAMERA_ON_ROOM_IDS = ['1300572813047894119', '1228945365764669531', '1228946332111077447', '1298580693668069476', '1309111502757953557'];
 const DAILY_CHANNEL_ID = '1367618478747680870';
 const WEEKLY_CHANNEL_ID = '1367618555339870208';
 const MONTHLY_CHANNEL_ID = '1367618620460499037';
@@ -63,6 +56,9 @@ client.once('ready', async () => {
       .addIntegerOption(opt => opt.setName('hours').setDescription('Hours').setRequired(true))
       .addStringOption(opt => opt.setName('type').setDescription('Camera Type').setRequired(true)
         .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
+    new SlashCommandBuilder().setName('leaderboard').setDescription('Show the leaderboard manually (Admin only).')
+      .addStringOption(opt => opt.setName('type').setDescription('Leaderboard Type').setRequired(true)
+        .addChoices({ name: 'Daily', value: 'daily' }, { name: 'Weekly', value: 'weekly' }, { name: 'Monthly', value: 'monthly' })),
   ];
   await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands.map(cmd => cmd.toJSON()) });
   console.log(`Bot is online as ${client.user.tag}`);
@@ -83,15 +79,10 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     const durationHrs = durationMs / 3600000;
     const camType = CAMERA_ON_ROOM_IDS.includes(oldState.channelId) ? 'camOn' : 'camOff';
 
-    if (!data.studyData[userId]) data.studyData[userId] = { camOn: 0, camOff: 0 };
-    if (!data.dailyData[userId]) data.dailyData[userId] = { camOn: 0, camOff: 0 };
-    if (!data.weeklyData[userId]) data.weeklyData[userId] = { camOn: 0, camOff: 0 };
-    if (!data.monthlyData[userId]) data.monthlyData[userId] = { camOn: 0, camOff: 0 };
-
-    data.studyData[userId][camType] += durationHrs;
-    data.dailyData[userId][camType] += durationHrs;
-    data.weeklyData[userId][camType] += durationHrs;
-    data.monthlyData[userId][camType] += durationHrs;
+    for (const dataset of [data.studyData, data.dailyData, data.weeklyData, data.monthlyData]) {
+      if (!dataset[userId]) dataset[userId] = { camOn: 0, camOff: 0 };
+      dataset[userId][camType] += durationHrs;
+    }
 
     saveData();
     delete joinTimestamps[userId];
@@ -104,9 +95,10 @@ function formatTime(hr) {
   return `${h} hrs ${m} mins`;
 }
 
-function generateLeaderboard(title, dataset) {
-  const sorted = Object.entries(dataset).sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff));
-  if (sorted.length === 0) return `No data available for ${title} leaderboard.\n**Server: Unstoppable | Owner: Yashwant Kumar**`;
+function generateLeaderboardEmbed(title, dataset) {
+  const sorted = Object.entries(dataset)
+    .sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff))
+    .slice(0, 10);
 
   const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
   const date = new Date(now);
@@ -117,11 +109,24 @@ function generateLeaderboard(title, dataset) {
     ? `Week of ${date.toLocaleDateString('en-IN')}`
     : date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 
-  let msg = `@everyone\n__**${title} Leaderboard (${label})**__\n**Server: Unstoppable | Owner: Yashwant Kumar**\n`;
-  sorted.forEach(([id, h], i) => {
-    msg += `\n**#${i + 1}** <@${id}> — **${formatTime(h.camOn + h.camOff)}**\n✅ ${formatTime(h.camOn)} | ❌ ${formatTime(h.camOff)}`;
-  });
-  return msg;
+  const embed = new EmbedBuilder()
+    .setTitle(`📋 ${title} Leaderboard — ${label}`)
+    .setDescription(`**Server: Unstoppable | Owner: Yashwant Kumar**`)
+    .setColor(0x00bfff)
+    .setFooter({ text: 'Top 10 Students Hustling!' });
+
+  if (sorted.length === 0) {
+    embed.addFields({ name: "No data available", value: "Start studying to appear on the leaderboard!" });
+  } else {
+    sorted.forEach(([id, h], i) => {
+      embed.addFields({
+        name: `#${i + 1} — <@${id}>`,
+        value: `✅ ${formatTime(h.camOn)} | ❌ ${formatTime(h.camOff)}\n**Total: ${formatTime(h.camOn + h.camOff)}**`
+      });
+    });
+  }
+
+  return embed;
 }
 
 client.on('interactionCreate', async interaction => {
@@ -168,38 +173,58 @@ client.on('interactionCreate', async interaction => {
     const type = options.getString('type');
     const isAdd = commandName === 'addhours';
 
-    if (!data.studyData[targetUser.id]) data.studyData[targetUser.id] = { camOn: 0, camOff: 0 };
-    if (!data.dailyData[targetUser.id]) data.dailyData[targetUser.id] = { camOn: 0, camOff: 0 };
-    if (!data.weeklyData[targetUser.id]) data.weeklyData[targetUser.id] = { camOn: 0, camOff: 0 };
-    if (!data.monthlyData[targetUser.id]) data.monthlyData[targetUser.id] = { camOn: 0, camOff: 0 };
+    for (const dataset of [data.studyData, data.dailyData, data.weeklyData, data.monthlyData]) {
+      if (!dataset[targetUser.id]) dataset[targetUser.id] = { camOn: 0, camOff: 0 };
+    }
 
     if (isAdd) {
-      data.studyData[targetUser.id][type] += hoursValue;
-      data.dailyData[targetUser.id][type] += hoursValue;
-      data.weeklyData[targetUser.id][type] += hoursValue;
-      data.monthlyData[targetUser.id][type] += hoursValue;
+      for (const dataset of [data.studyData, data.dailyData, data.weeklyData, data.monthlyData]) {
+        dataset[targetUser.id][type] += hoursValue;
+      }
     } else {
-      data.studyData[targetUser.id][type] = Math.max(0, data.studyData[targetUser.id][type] - hoursValue);
-      data.dailyData[targetUser.id][type] = Math.max(0, data.dailyData[targetUser.id][type] - hoursValue);
-      data.weeklyData[targetUser.id][type] = Math.max(0, data.weeklyData[targetUser.id][type] - hoursValue);
-      data.monthlyData[targetUser.id][type] = Math.max(0, data.monthlyData[targetUser.id][type] - hoursValue);
+      for (const dataset of [data.studyData, data.dailyData, data.weeklyData, data.monthlyData]) {
+        dataset[targetUser.id][type] = Math.max(0, dataset[targetUser.id][type] - hoursValue);
+      }
     }
 
     saveData();
-    return interaction.reply(`Successfully ${isAdd ? 'added' : 'removed'} ${hoursValue} hrs to ${targetUser.username}'s ${type === 'camOn' ? 'Camera On' : 'Camera Off'} study hours.\n**Server: Unstoppable | Owner: Yashwant Kumar**`);
+    return interaction.reply(`Successfully ${isAdd ? 'added' : 'removed'} ${hoursValue} hrs to ${targetUser.username}'s ${type === 'camOn' ? 'Camera On' : 'Camera Off'} hours.\n**Server: Unstoppable | Owner: Yashwant Kumar**`);
+  }
+
+  if (commandName === 'leaderboard') {
+    if (!member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
+      return interaction.reply({ content: 'Only admins can use this command.', ephemeral: true });
+    }
+
+    const type = options.getString('type');
+    let dataset, title;
+
+    if (type === 'daily') {
+      dataset = data.dailyData;
+      title = 'Daily';
+    } else if (type === 'weekly') {
+      dataset = data.weeklyData;
+      title = 'Weekly';
+    } else {
+      dataset = data.monthlyData;
+      title = 'Monthly';
+    }
+
+    const embed = generateLeaderboardEmbed(title, dataset);
+    return interaction.reply({ embeds: [embed] });
   }
 });
 
 cron.schedule('0 0 * * *', () => {
   const ch = client.channels.cache.get(DAILY_CHANNEL_ID);
-  ch?.send(generateLeaderboard('Daily', data.dailyData));
+  ch?.send({ embeds: [generateLeaderboardEmbed('Daily', data.dailyData)] });
   data.dailyData = {};
   saveData();
 });
 
 cron.schedule('0 0 * * 0', () => {
   const ch = client.channels.cache.get(WEEKLY_CHANNEL_ID);
-  ch?.send(generateLeaderboard('Weekly', data.weeklyData));
+  ch?.send({ embeds: [generateLeaderboardEmbed('Weekly', data.weeklyData)] });
   data.weeklyData = {};
   saveData();
 });
@@ -209,7 +234,7 @@ cron.schedule('0 0 28-31 * *', () => {
   const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   if (today.getDate() === lastDay) {
     const ch = client.channels.cache.get(MONTHLY_CHANNEL_ID);
-    ch?.send(generateLeaderboard('Monthly', data.monthlyData));
+    ch?.send({ embeds: [generateLeaderboardEmbed('Monthly', data.monthlyData)] });
     data.monthlyData = {};
     saveData();
   }
