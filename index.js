@@ -95,22 +95,27 @@ function formatTime(hr) {
   return `${h} hrs ${m} mins`;
 }
 
-function generateLeaderboardEmbed(title, dataset) {
+function getISTDateLabel(title) {
+  const date = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const dt = new Date(date);
+
+  if (title === 'Daily') {
+    return dt.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  } else if (title === 'Weekly') {
+    const startOfWeek = new Date(dt.setDate(dt.getDate() - dt.getDay())); // Start of the week (Sunday)
+    return `${startOfWeek.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} - ${dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  } else {
+    return dt.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  }
+}
+
+function generateLeaderboardEmbed(title, dataset, dateRange) {
   const sorted = Object.entries(dataset)
     .sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff))
     .slice(0, 10);
 
-  const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-  const date = new Date(now);
-
-  const label = title === 'Daily'
-    ? date.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-    : title === 'Weekly'
-    ? `Week of ${date.toLocaleDateString('en-IN')}`
-    : date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-
   const embed = new EmbedBuilder()
-    .setTitle(`📋 ${title} Leaderboard — ${label}`)
+    .setTitle(`📋 ${title} Leaderboard — ${dateRange}`)
     .setDescription(`**Server: Unstoppable | Owner: Yashwant Kumar**`)
     .setColor(0x00bfff)
     .setFooter({ text: 'Top 10 Students Hustling!' });
@@ -210,28 +215,43 @@ client.on('interactionCreate', async interaction => {
       title = 'Monthly';
     }
 
-    const embed = generateLeaderboardEmbed(title, dataset);
+    const dateRange = getISTDateLabel(title);
+    const embed = generateLeaderboardEmbed(title, dataset, dateRange);
     return interaction.reply({ embeds: [embed] });
   }
 });
 
+// Auto leaderboard + reset
+
 cron.schedule('0 0 * * *', () => {
   const ch = client.channels.cache.get(DAILY_CHANNEL_ID);
-  ch?.send({ embeds: [generateLeaderboardEmbed('Daily', data.dailyData)] });
+  const dailyDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const formattedDate = new Date(dailyDate).toLocaleDateString('en-IN', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+
+  ch?.send({ embeds: [generateLeaderboardEmbed('Daily', data.dailyData, formattedDate)] });
   data.dailyData = {};
   saveData();
 });
 
 cron.schedule('0 0 * * 0', () => {
   const ch = client.channels.cache.get(WEEKLY_CHANNEL_ID);
-  ch?.send({ embeds: [generateLeaderboardEmbed('Weekly', data.weeklyData)] });
+  const weeklyDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const startOfWeek = new Date(new Date(weeklyDate).setDate(new Date(weeklyDate).getDate() - new Date(weeklyDate).getDay())); // Start of the week (Sunday)
+  const formattedWeekRange = `${startOfWeek.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} - ${new Date(weeklyDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+
+  ch?.send({ embeds: [generateLeaderboardEmbed('Weekly', data.weeklyData, formattedWeekRange)] });
   data.weeklyData = {};
   saveData();
 });
 
 cron.schedule('0 0 1 * *', () => {
   const ch = client.channels.cache.get(MONTHLY_CHANNEL_ID);
-  ch?.send({ embeds: [generateLeaderboardEmbed('Monthly', data.monthlyData)] });
+  const monthlyDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const formattedMonthRange = `${new Date(monthlyDate).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}`;
+
+  ch?.send({ embeds: [generateLeaderboardEmbed('Monthly', data.monthlyData, formattedMonthRange)] });
   data.monthlyData = {};
   saveData();
 });
