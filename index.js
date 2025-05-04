@@ -213,7 +213,7 @@ client.on('interactionCreate', async interaction => {
       .addFields(
         { name: '✅ Camera On', value: `**${formatTime(hours.camOn)}**\n_${focusTag}_`, inline: true },
         { name: '❌ Camera Off', value: `**${formatTime(hours.camOff)}**\n_${silentTag}_`, inline: true },
-        { name: '⏳ Total', value: `__━━━━━━━━━━━━━━━━━__\n__**${formatTime(hours.camOn + hours.camOff)}**__\n__━━━━━━━━━━━━━━━━━__`, inline: false }
+        { name: '__⏳ Total__', value: `**${formatTime(hours.camOn + hours.camOff)}**\n__━━━━━━━━━━━━━━━━━__`, inline: false }
       )
       .setColor(0x4e9af1)
       .setThumbnail('https://cdn-icons-png.flaticon.com/512/3176/3176366.png')
