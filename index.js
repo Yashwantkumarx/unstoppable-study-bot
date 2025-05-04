@@ -203,7 +203,13 @@ client.on('interactionCreate', async interaction => {
 
     const embed = new EmbedBuilder()
       .setTitle(`📊 ${target.username}'s Study Report`)
-      .setDescription(`Date: **${today}**\n**Server: Unstoppable | Owner: Yashwant Kumar**`)
+      .setDescription(
+  `Date: **${today}**\n` +
+  `**━━━━━━━ SERVER INFO ━━━━━━━**\n` +
+  `**Server:** __**Unstoppable**__\n` +
+  `**Owner:** __**Yashwant Kumar**__\n` +
+  `━━━━━━━━━━━━━━━━━━━━━━`
+)
       .addFields(
         { name: '✅ Camera On', value: `**${formatTime(hours.camOn)}**\n_${focusTag}_`, inline: true },
         { name: '❌ Camera Off', value: `**${formatTime(hours.camOff)}**\n_${silentTag}_`, inline: true },
