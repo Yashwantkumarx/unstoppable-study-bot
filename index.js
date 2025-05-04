@@ -286,39 +286,48 @@ cron.schedule('* * * * *', () => {
   saveData();
 });
 
-// Auto leaderboard + reset
+// Auto leaderboard + reset at 11:59 PM IST with @everyone
 
-cron.schedule('0 0 * * *', () => {
+// Daily at 11:59 PM IST
+cron.schedule('59 23 * * *', () => {
   const ch = client.channels.cache.get(DAILY_CHANNEL_ID);
   const dailyDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
   const formattedDate = new Date(dailyDate).toLocaleDateString('en-IN', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   });
 
-  ch?.send({ embeds: [generateLeaderboardEmbed('Daily', data.dailyData, formattedDate)] });
+  ch?.send({ content: '@everyone', embeds: [generateLeaderboardEmbed('Daily', data.dailyData, formattedDate)] });
   data.dailyData = {};
   saveData();
 });
 
-cron.schedule('0 0 * * 0', () => {
+// Weekly at 11:59 PM every Sunday IST
+cron.schedule('59 23 * * 0', () => {
   const ch = client.channels.cache.get(WEEKLY_CHANNEL_ID);
   const weeklyDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-  const startOfWeek = new Date(new Date(weeklyDate).setDate(new Date(weeklyDate).getDate() - new Date(weeklyDate).getDay())); // Start of the week (Sunday)
+  const startOfWeek = new Date(new Date(weeklyDate).setDate(new Date(weeklyDate).getDate() - new Date(weeklyDate).getDay()));
   const formattedWeekRange = `${startOfWeek.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} - ${new Date(weeklyDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
-  ch?.send({ embeds: [generateLeaderboardEmbed('Weekly', data.weeklyData, formattedWeekRange)] });
+  ch?.send({ content: '@everyone', embeds: [generateLeaderboardEmbed('Weekly', data.weeklyData, formattedWeekRange)] });
   data.weeklyData = {};
   saveData();
 });
 
-cron.schedule('0 0 1 * *', () => {
-  const ch = client.channels.cache.get(MONTHLY_CHANNEL_ID);
-  const monthlyDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-  const formattedMonthRange = `${new Date(monthlyDate).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}`;
+// Monthly at 11:59 PM on the last day of the month IST
+cron.schedule('59 23 * * *', () => {
+  const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const date = new Date(now);
+  const tomorrow = new Date(date);
+  tomorrow.setDate(date.getDate() + 1);
 
-  ch?.send({ embeds: [generateLeaderboardEmbed('Monthly', data.monthlyData, formattedMonthRange)] });
-  data.monthlyData = {};
-  saveData();
+  if (tomorrow.getDate() === 1) {
+    const ch = client.channels.cache.get(MONTHLY_CHANNEL_ID);
+    const formattedMonth = date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+
+    ch?.send({ content: '@everyone', embeds: [generateLeaderboardEmbed('Monthly', data.monthlyData, formattedMonth)] });
+    data.monthlyData = {};
+    saveData();
+  }
 });
 
 client.login(process.env.TOKEN);
