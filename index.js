@@ -42,6 +42,20 @@ const silentTaglines = ["Silent Hustle", "Quiet Grind", "Alone But Focused", "Pe
 
 client.once('ready', async () => {
   loadData();
+
+// Restore joinTimestamps for members already in voice channels
+client.guilds.cache.forEach(guild => {
+  guild.channels.cache.forEach(channel => {
+    if (channel.type === 2) { // Voice channel
+      channel.members.forEach(member => {
+        if (!joinTimestamps[member.id]) {
+          joinTimestamps[member.id] = Date.now();
+        }
+      });
+    }
+  });
+});
+  
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   const commands = [
     new SlashCommandBuilder().setName('myhours').setDescription("Check today's study hours.")
