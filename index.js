@@ -152,7 +152,12 @@ function generateLeaderboardEmbed(title, dataset) {
 
   const embed = new EmbedBuilder()
     .setTitle(`🏆 ${title} Leaderboard — ${label}`)
-    .setDescription(`**Server:** Unstoppable\n**Owner:** Yashwant Kumar`)
+    .setDescription(
+      `**━━━━━━━ SERVER INFO ━━━━━━━**\n` +
+      `**Server:** __**Unstoppable**__\n` +
+      `**Owner:** __**Yashwant Kumar**__\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━`
+    )
     .setColor(0x00bfff)
     .setFooter({ text: 'Top 10 Students Hustling!' });
 
@@ -165,7 +170,7 @@ function generateLeaderboardEmbed(title, dataset) {
     sorted.forEach(([id, h], i) => {
       const total = h.camOn + h.camOff;
       embed.addFields({
-        name: `#${i + 1} — <@${id}>`,
+        name: `━━━━━━━━━━━━━━━━━━━━━━\n__**#${i + 1} — <@${id}>**__\n━━━━━━━━━━━━━━━━━━━━━━`,
         value:
           `**🟢 Camera On:** \`${formatTime(h.camOn)}\`\n` +
           `**❌ Camera Off:** \`${formatTime(h.camOff)}\`\n` +
