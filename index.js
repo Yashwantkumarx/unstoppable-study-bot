@@ -143,51 +143,43 @@ function getISTDateLabel(title) {
   }
 }
 
-function generateTripleLeaderboardEmbed(title, dataset) {
-  const camOnSorted = Object.entries(dataset)
-    .sort(([, a], [, b]) => b.camOn - a.camOn)
-    .slice(0, 10);
+function generateMultiLeaderboardEmbed(title, dataset) {
+  const sorted = Object.entries(dataset);
 
-  const camOffSorted = Object.entries(dataset)
-    .sort(([, a], [, b]) => b.camOff - a.camOff)
-    .slice(0, 10);
-
-  const totalSorted = Object.entries(dataset)
-    .sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff))
-    .slice(0, 10);
+  // Sort by different categories
+  const topCamOn = [...sorted].sort(([, a], [, b]) => b.camOn - a.camOn).slice(0, 10);
+  const topCamOff = [...sorted].sort(([, a], [, b]) => b.camOff - a.camOff).slice(0, 10);
+  const topTotal = [...sorted].sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff)).slice(0, 10);
 
   const label = getISTDateLabel(title);
 
   const embed = new EmbedBuilder()
-    .setTitle(`📊 ${title} Leaderboard — ${label}`)
-    .setDescription(`**Server:** Unstoppable\n**Owner:** Yashwant Kumar`)
-    .setColor(0x1abc9c)
-    .setFooter({ text: 'Stay consistent. Stay Unstoppable.' });
+    .setTitle(`📊 ${title} Leaderboards — ${label}`)
+    .setDescription(`**Server: Unstoppable | Owner: Yashwant Kumar**`)
+    .setColor(0x00bfff)
+    .setFooter({ text: 'Grind hard, climb fast. Stay Unstoppable!' });
 
-  // Camera On
-  embed.addFields({
-    name: '🟢 Top 10 — Camera On',
-    value: camOnSorted.map(([id, h], i) =>
-      `**#${i + 1}** — <@${id}> | 🕒 \`${formatTime(h.camOn)}\``
-    ).join('\n') || '*No entries yet!*'
-  });
+  // Helper function to format entries
+  function formatEntries(entries, type = 'total') {
+    return entries.map(([id, h], i) => {
+      const rank = `#${i + 1}`;
+      if (type === 'camOn') {
+        return `**${rank}** — <@${id}>  |  📸 \`${formatTime(h.camOn)}\``;
+      } else if (type === 'camOff') {
+        return `**${rank}** — <@${id}>  |  🔇 \`${formatTime(h.camOff)}\``;
+      } else {
+        const total = h.camOn + h.camOff;
+        return `**${rank}** — <@${id}>  |  ⏳ \`${formatTime(total)}\``;
+      }
+    }).join('\n');
+  }
 
-  // Camera Off
-  embed.addFields({
-    name: '❌ Top 10 — Camera Off',
-    value: camOffSorted.map(([id, h], i) =>
-      `**#${i + 1}** — <@${id}> | 🕒 \`${formatTime(h.camOff)}\``
-    ).join('\n') || '*No entries yet!*'
-  });
-
-  // Total Time
-  embed.addFields({
-    name: '⏳ Top 10 — Total Time (On + Off)',
-    value: totalSorted.map(([id, h], i) => {
-      const total = h.camOn + h.camOff;
-      return `**#${i + 1}** — <@${id}> | 🕒 \`${formatTime(total)}\``;
-    }).join('\n') || '*No entries yet!*'
-  });
+  // Add each leaderboard
+  embed.addFields(
+    { name: '📸 Top 10 Camera On', value: formatEntries(topCamOn, 'camOn') || 'No data yet.', inline: false },
+    { name: '🔇 Top 10 Camera Off', value: formatEntries(topCamOff, 'camOff') || 'No data yet.', inline: false },
+    { name: '⏳ Top 10 Total Time', value: formatEntries(topTotal, 'total') || 'No data yet.', inline: false }
+  );
 
   return embed;
 }
