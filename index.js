@@ -143,36 +143,51 @@ function getISTDateLabel(title) {
   }
 }
 
-function generateLeaderboardEmbed(title, dataset) {
-  const sorted = Object.entries(dataset)
+function generateTripleLeaderboardEmbed(title, dataset) {
+  const camOnSorted = Object.entries(dataset)
+    .sort(([, a], [, b]) => b.camOn - a.camOn)
+    .slice(0, 10);
+
+  const camOffSorted = Object.entries(dataset)
+    .sort(([, a], [, b]) => b.camOff - a.camOff)
+    .slice(0, 10);
+
+  const totalSorted = Object.entries(dataset)
     .sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff))
     .slice(0, 10);
 
   const label = getISTDateLabel(title);
 
   const embed = new EmbedBuilder()
-    .setTitle(`🏆 ${title} Leaderboard — ${label}`)
+    .setTitle(`📊 ${title} Leaderboard — ${label}`)
     .setDescription(`**Server:** Unstoppable\n**Owner:** Yashwant Kumar`)
-    .setColor(0x00bfff)
-    .setFooter({ text: 'Top 10 Students Hustling!' });
+    .setColor(0x1abc9c)
+    .setFooter({ text: 'Stay consistent. Stay Unstoppable.' });
 
-  if (sorted.length === 0) {
-    embed.addFields({
-      name: "No data yet!",
-      value: "Start your grind today to appear on the leaderboard!"
-    });
-  } else {
-    sorted.forEach(([id, h], i) => {
+  // Camera On
+  embed.addFields({
+    name: '🟢 Top 10 — Camera On',
+    value: camOnSorted.map(([id, h], i) =>
+      `**#${i + 1}** — <@${id}> | 🕒 \`${formatTime(h.camOn)}\``
+    ).join('\n') || '*No entries yet!*'
+  });
+
+  // Camera Off
+  embed.addFields({
+    name: '❌ Top 10 — Camera Off',
+    value: camOffSorted.map(([id, h], i) =>
+      `**#${i + 1}** — <@${id}> | 🕒 \`${formatTime(h.camOff)}\``
+    ).join('\n') || '*No entries yet!*'
+  });
+
+  // Total Time
+  embed.addFields({
+    name: '⏳ Top 10 — Total Time (On + Off)',
+    value: totalSorted.map(([id, h], i) => {
       const total = h.camOn + h.camOff;
-      embed.addFields({
-        name: `#${i + 1} — <@${id}>`,
-        value:
-          `**🟢 Camera On:** \`${formatTime(h.camOn)}\`  |  **❌ Camera Off:** \`${formatTime(h.camOff)}\`\n` +
-          `**⏳ Total:** \`${formatTime(total)}\``,
-        inline: false
-      });
-    });
-  }
+      return `**#${i + 1}** — <@${id}> | 🕒 \`${formatTime(total)}\``;
+    }).join('\n') || '*No entries yet!*'
+  });
 
   return embed;
 }
