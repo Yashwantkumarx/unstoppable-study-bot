@@ -143,43 +143,37 @@ function getISTDateLabel(title) {
   }
 }
 
-function generateMultiLeaderboardEmbed(title, dataset) {
-  const sorted = Object.entries(dataset);
-
-  // Sort by different categories
-  const topCamOn = [...sorted].sort(([, a], [, b]) => b.camOn - a.camOn).slice(0, 10);
-  const topCamOff = [...sorted].sort(([, a], [, b]) => b.camOff - a.camOff).slice(0, 10);
-  const topTotal = [...sorted].sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff)).slice(0, 10);
+function generateLeaderboardEmbed(title, dataset) {
+  const sorted = Object.entries(dataset)
+    .sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff))
+    .slice(0, 10);
 
   const label = getISTDateLabel(title);
 
   const embed = new EmbedBuilder()
-    .setTitle(`📊 ${title} Leaderboards — ${label}`)
-    .setDescription(`**Server: Unstoppable | Owner: Yashwant Kumar**`)
+    .setTitle(`🏆 ${title} Leaderboard — ${label}`)
+    .setDescription(`**Server:** Unstoppable\n**Owner:** Yashwant Kumar`)
     .setColor(0x00bfff)
-    .setFooter({ text: 'Grind hard, climb fast. Stay Unstoppable!' });
+    .setFooter({ text: 'Top 10 Students Hustling!' });
 
-  // Helper function to format entries
-  function formatEntries(entries, type = 'total') {
-    return entries.map(([id, h], i) => {
-      const rank = `#${i + 1}`;
-      if (type === 'camOn') {
-        return `**${rank}** — <@${id}>  |  📸 \`${formatTime(h.camOn)}\``;
-      } else if (type === 'camOff') {
-        return `**${rank}** — <@${id}>  |  🔇 \`${formatTime(h.camOff)}\``;
-      } else {
-        const total = h.camOn + h.camOff;
-        return `**${rank}** — <@${id}>  |  ⏳ \`${formatTime(total)}\``;
-      }
-    }).join('\n');
+  if (sorted.length === 0) {
+    embed.addFields({
+      name: "No data yet!",
+      value: "Start your grind today to appear on the leaderboard!"
+    });
+  } else {
+    sorted.forEach(([id, h], i) => {
+      const total = h.camOn + h.camOff;
+      embed.addFields({
+        name: `#${i + 1} — <@${id}>`,
+        value:
+          `**🟢 Camera On:** \`${formatTime(h.camOn)}\`\n` +
+          `**❌ Camera Off:** \`${formatTime(h.camOff)}\`\n` +
+          `**⏳ Total:** \`${formatTime(total)}\``,
+        inline: false
+      });
+    });
   }
-
-  // Add each leaderboard
-  embed.addFields(
-    { name: '📸 Top 10 Camera On', value: formatEntries(topCamOn, 'camOn') || 'No data yet.', inline: false },
-    { name: '🔇 Top 10 Camera Off', value: formatEntries(topCamOff, 'camOff') || 'No data yet.', inline: false },
-    { name: '⏳ Top 10 Total Time', value: formatEntries(topTotal, 'total') || 'No data yet.', inline: false }
-  );
 
   return embed;
 }
@@ -265,7 +259,7 @@ client.on('interactionCreate', async interaction => {
     }
 
     const dateRange = getISTDateLabel(title);
-    const embed = generateMultiLeaderboardEmbed(title, dataset);
+    const embed = generateLeaderboardEmbed(title, dataset);
     return interaction.reply({ embeds: [embed] });
   }
 });
