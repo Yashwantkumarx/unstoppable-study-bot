@@ -19,6 +19,7 @@ const CAMERA_ON_ROOM_IDS = ['1300572813047894119', '1228945365764669531', '12289
 const DAILY_CHANNEL_ID = '1367618478747680870';
 const WEEKLY_CHANNEL_ID = '1367618555339870208';
 const MONTHLY_CHANNEL_ID = '1367618620460499037';
+const LEADERBOARD_REMINDER_CHANNEL_ID = '1367722181412257913';
 const DATA_FILE = './data.json';
 
 let data = { dailyData: {}, weeklyData: {}, monthlyData: {}, studyData: {} };
@@ -284,6 +285,34 @@ cron.schedule('* * * * *', () => {
   }
 
   saveData();
+});
+
+const motivationalQuotes = [
+  "Push yourself, because no one else is going to do it for you.",
+  "Every minute counts. Make it worth it.",
+  "Study now, shine later.",
+  "Today’s hustle, tomorrow’s success.",
+  "Discipline is the bridge between goals and achievement.",
+  "It’s not about having time, it’s about making time.",
+  "Stay focused. Stay determined. Stay unstoppable."
+];
+
+// Daily kickoff message — 00:00 IST (18:30 UTC)
+cron.schedule('30 18 * * *', () => {
+  const quote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
+  const channel = client.channels.cache.get(LEADERBOARD_REMINDER_CHANNEL_ID);
+
+  const embed = new EmbedBuilder()
+    .setTitle("🔥 Daily Study Challenge Begins!")
+    .setDescription(`**"${quote}"**\n\nWant to see your name on **today's leaderboard**?\nYou’ve got **24 hours** to make it happen.\n\n**Clock’s ticking — let the grind begin!**`)
+    .setColor(0xffae00)
+    .setFooter({ text: 'Unstoppable | Owner: Yashwant Kumar' })
+    .setTimestamp();
+
+  channel?.send({
+    content: '@everyone',
+    embeds: [embed]
+  });
 });
 
 // Auto leaderboard + reset at 11:59 PM IST with @everyone
