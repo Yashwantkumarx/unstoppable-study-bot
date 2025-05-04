@@ -212,7 +212,7 @@ client.on('interactionCreate', async interaction => {
 )
       .addFields(
         { name: '✅ Camera On', value: `**${formatTime(hours.camOn)}**\n_${focusTag}_`, inline: true },
-        { name: '❌ Camera Off', value: `**${formatTime(hours.camOff)}**\n_${silentTag}_`, inline: true },
+        { name: '❌ Camera Off', value: `**${formatTime(hours.camOff)}**\n_${silentTag}_\n__━━━━━━━━━━━━━━━━━__`, inline: true },
         { name: '__⏳ Total__', value: `**${formatTime(hours.camOn + hours.camOff)}**\n__━━━━━━━━━━━━━━━━━__`, inline: false }
       )
       .setColor(0x4e9af1)
