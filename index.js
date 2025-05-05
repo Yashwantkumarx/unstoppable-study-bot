@@ -328,6 +328,8 @@ cron.schedule('30 18 * * *', () => {
     content: '@everyone',
     embeds: [embed]
   });
+}, {
+  timezone: 'Asia/Kolkata'
 });
 
 // Auto leaderboard + reset at 11:59 PM IST with @everyone
@@ -343,6 +345,8 @@ cron.schedule('59 23 * * *', () => {
   ch?.send({ content: '@everyone', embeds: [generateLeaderboardEmbed('Daily', data.dailyData, formattedDate)] });
   data.dailyData = {};
   saveData();
+}, {
+  timezone: 'Asia/Kolkata'
 });
 
 // Weekly at 11:59 PM every Sunday IST
@@ -355,6 +359,8 @@ cron.schedule('59 23 * * 0', () => {
   ch?.send({ content: '@everyone', embeds: [generateLeaderboardEmbed('Weekly', data.weeklyData, formattedWeekRange)] });
   data.weeklyData = {};
   saveData();
+}, {
+  timezone: 'Asia/Kolkata'
 });
 
 // Monthly at 11:59 PM on the last day of the month IST
@@ -372,6 +378,8 @@ cron.schedule('59 23 * * *', () => {
     data.monthlyData = {};
     saveData();
   }
+}, {
+  timezone: 'Asia/Kolkata'
 });
 
 client.login(process.env.TOKEN);
