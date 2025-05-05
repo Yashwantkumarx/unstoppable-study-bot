@@ -317,12 +317,18 @@ cron.schedule('0 0 * * *', () => {
   const quote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
   const channel = client.channels.cache.get(LEADERBOARD_REMINDER_CHANNEL_ID);
 
-  const embed = new EmbedBuilder()
-    .setTitle("🔥 Daily Study Challenge Begins!")
-    .setDescription(`**"${quote}"**\n\nWant to see your name on **today's leaderboard**?\nYou’ve got **24 hours** to make it happen.\n\n**Clock’s ticking — let the grind begin!**`)
-    .setColor(0xffae00)
-    .setFooter({ text: 'Unstoppable | Owner: Yashwant Kumar' })
-    .setTimestamp();
+const embed = new EmbedBuilder()
+  .setColor(0xffcc00)
+  .setTitle("⏰ 12:00 AM Daily Challenge")
+  .setDescription(
+    `>>> **“${quote}”**\n\n` +
+    `__Do you have what it takes to be on today's leaderboard?__\n` +
+    `You’ve got **24 hours** to prove your discipline.\n\n` +
+    `**Grind starts now. Let’s make it count!**`
+  )
+  .setThumbnail('https://cdn-icons-png.flaticon.com/512/1055/1055646.png')
+  .setFooter({ text: 'Unstoppable | Leaderboard resets daily at midnight IST' })
+  .setTimestamp();
 
   channel?.send({
     content: '@everyone',
