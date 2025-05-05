@@ -313,7 +313,7 @@ const motivationalQuotes = [
 ];
 
 // Daily kickoff message — 00:00 IST (18:30 UTC)
-cron.schedule('30 18 * * *', () => {
+cron.schedule('0 0 * * *', () => {
   const quote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
   const channel = client.channels.cache.get(LEADERBOARD_REMINDER_CHANNEL_ID);
 
