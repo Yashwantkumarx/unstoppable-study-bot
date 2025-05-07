@@ -290,6 +290,7 @@ if (commandName === 'leaderboard') {
     await interaction.reply({ content: 'Error while generating leaderboard.', ephemeral: true });
   }
 }
+ });
 
 // Track active voice users every minute
 cron.schedule('* * * * *', () => {
