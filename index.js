@@ -364,7 +364,12 @@ cron.schedule('59 23 * * *', () => {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   });
 
-  ch?.send({ content: '@everyone', embeds: [generateLeaderboardEmbed('Daily', data.dailyData, formattedDate)] });
+  (async () => {
+  const embed = await generateLeaderboardEmbed('Daily', data.dailyData);
+  ch?.send({ content: '@everyone', embeds: [embed] });
+  data.dailyData = {};
+  saveData();
+})();
   data.dailyData = {};
   saveData();
 }, {
@@ -378,7 +383,12 @@ cron.schedule('59 23 * * 0', () => {
   const startOfWeek = new Date(new Date(weeklyDate).setDate(new Date(weeklyDate).getDate() - new Date(weeklyDate).getDay()));
   const formattedWeekRange = `${startOfWeek.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} - ${new Date(weeklyDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`;
 
-  ch?.send({ content: '@everyone', embeds: [generateLeaderboardEmbed('Weekly', data.weeklyData, formattedWeekRange)] });
+  (async () => {
+  const embed = await generateLeaderboardEmbed('Weekly', data.weeklyData);
+  ch?.send({ content: '@everyone', embeds: [embed] });
+  data.weeklyData = {};
+  saveData();
+})();
   data.weeklyData = {};
   saveData();
 }, {
@@ -396,7 +406,12 @@ cron.schedule('59 23 * * *', () => {
     const ch = client.channels.cache.get(MONTHLY_CHANNEL_ID);
     const formattedMonth = date.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 
-    ch?.send({ content: '@everyone', embeds: [generateLeaderboardEmbed('Monthly', data.monthlyData, formattedMonth)] });
+    (async () => {
+  const embed = await generateLeaderboardEmbed('Monthly', data.monthlyData);
+  ch?.send({ content: '@everyone', embeds: [embed] });
+  data.monthlyData = {};
+  saveData();
+})();
     data.monthlyData = {};
     saveData();
   }
