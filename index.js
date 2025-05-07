@@ -263,30 +263,33 @@ client.on('interactionCreate', async interaction => {
     return interaction.reply(`Successfully ${isAdd ? 'added' : 'removed'} ${hoursValue} hrs to ${targetUser.username}'s ${type === 'camOn' ? 'Camera On' : 'Camera Off'} hours.\n**Server: Unstoppable | Owner: Yashwant Kumar**`);
   }
 
-  if (commandName === 'leaderboard') {
-    if (!member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
-      return interaction.reply({ content: 'Only admins can use this command.', ephemeral: true });
-    }
-
-    const type = options.getString('type');
-    let dataset, title;
-
-    if (type === 'daily') {
-      dataset = data.dailyData;
-      title = 'Daily';
-    } else if (type === 'weekly') {
-      dataset = data.weeklyData;
-      title = 'Weekly';
-    } else {
-      dataset = data.monthlyData;
-      title = 'Monthly';
-    }
-
-    const dateRange = getISTDateLabel(title);
-    const embed = generateLeaderboardEmbed(title, dataset);
-    return interaction.reply({ embeds: [embed] });
+if (commandName === 'leaderboard') {
+  if (!member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
+    return interaction.reply({ content: 'Only admins can use this command.', ephemeral: true });
   }
-});
+
+  const type = options.getString('type');
+  let dataset, title;
+
+  if (type === 'daily') {
+    dataset = data.dailyData;
+    title = 'Daily';
+  } else if (type === 'weekly') {
+    dataset = data.weeklyData;
+    title = 'Weekly';
+  } else {
+    dataset = data.monthlyData;
+    title = 'Monthly';
+  }
+
+  try {
+    const embed = await generateLeaderboardEmbed(title, dataset);
+    await interaction.reply({ embeds: [embed] });
+  } catch (err) {
+    console.error('Leaderboard command error:', err);
+    await interaction.reply({ content: 'Error while generating leaderboard.', ephemeral: true });
+  }
+}
 
 // Track active voice users every minute
 cron.schedule('* * * * *', () => {
