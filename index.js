@@ -143,12 +143,13 @@ function getISTDateLabel(title) {
   }
 }
 
-function generateLeaderboardEmbed(title, dataset) {
+async function generateLeaderboardEmbed(title, dataset) {
   const sorted = Object.entries(dataset)
     .sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff))
     .slice(0, 10);
 
   const label = getISTDateLabel(title);
+  const rankEmojis = ['🥇', '🥈', '🥉', '🔥', '💎', '🌟', '⚡', '🎯', '🚀', '📈'];
 
   const embed = new EmbedBuilder()
     .setTitle(`🏆 ${title} Leaderboard — ${label}`)
@@ -167,17 +168,29 @@ function generateLeaderboardEmbed(title, dataset) {
       value: "Start your grind today to appear on the leaderboard!"
     });
   } else {
-    sorted.forEach(([id, h], i) => {
+    for (let i = 0; i < sorted.length; i++) {
+      const [id, h] = sorted[i];
+      let user;
+
+      try {
+        user = await client.users.fetch(id);
+      } catch (err) {
+        user = null;
+      }
+
+      const username = user ? user.username : `User (${id})`;
       const total = h.camOn + h.camOff;
+      const rankEmoji = rankEmojis[i] || '🏅';
+
       embed.addFields({
-        name: `━━━━━━━━━━━━━━━━━━━━━━\n__**#${i + 1} — <@${id}>**__\n━━━━━━━━━━━━━━━━━━━━━━`,
+        name: `━━━━━━━━━━━━━━━━━━━━━━\n__**#${i + 1} ${rankEmoji} — ${username}**__\n━━━━━━━━━━━━━━━━━━━━━━`,
         value:
           `**🟢 Camera On:** \`${formatTime(h.camOn)}\`\n` +
           `**❌ Camera Off:** \`${formatTime(h.camOff)}\`\n` +
           `**⏳ Total:** \`${formatTime(total)}\``,
         inline: false
       });
-    });
+    }
   }
 
   return embed;
@@ -202,7 +215,7 @@ client.on('interactionCreate', async interaction => {
     });
 
     const embed = new EmbedBuilder()
-      .setTitle(`📊 ${target.username}'s Study Report`)
+      .setTitle(`📊 ${interaction.guild.members.cache.get(target.id)?.displayName || target.username}'s Study Report`)
       .setDescription(
   `Date: **${today}**\n` +
   `**━━━━━━━ SERVER INFO ━━━━━━━**\n` +
