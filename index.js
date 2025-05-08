@@ -170,15 +170,19 @@ async function generateLeaderboardEmbed(title, dataset) {
   } else {
     for (let i = 0; i < sorted.length; i++) {
       const [id, h] = sorted[i];
-      let user;
-
-      try {
-        user = await client.users.fetch(id);
-      } catch (err) {
-        user = null;
-      }
-
-      const username = user ? user.username : `User (${id})`;
+      let username;
+try {
+  const guild = client.guilds.cache.first(); // Ya interaction.guild use kar sakte ho agar available ho
+  const member = guild.members.cache.get(id) || await guild.members.fetch(id);
+  username = member.displayName;
+} catch {
+  try {
+    const user = await client.users.fetch(id);
+    username = user.username;
+  } catch {
+    username = `User (${id})`;
+  }
+}
       const total = h.camOn + h.camOff;
       const rankEmoji = rankEmojis[i] || '🏅';
 
