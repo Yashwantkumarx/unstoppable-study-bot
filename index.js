@@ -129,10 +129,26 @@ function getISTDateLabel(title) {
     }).format(now);
     return `${weekday}, ${formattedDate}`;
   } else if (title === 'Weekly') {
-    const weekStart = new Date(now);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday as start
-    const start = formatter.format(weekStart);
-    return `Week: ${start} → ${formattedDate}`;
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+const weekStart = new Date(nowIST);
+const day = weekStart.getDay(); // Sunday = 0
+weekStart.setDate(weekStart.getDate() - day);
+
+const start = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+}).format(weekStart);
+
+const end = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+}).format(nowIST);
+
+return `Week: ${start} → ${end}`;
   } else {
     const month = new Intl.DateTimeFormat('en-IN', {
       timeZone: 'Asia/Kolkata',
