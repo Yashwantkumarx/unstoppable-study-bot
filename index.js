@@ -15,16 +15,16 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// ✅ Rooms Tracking
+// ✅ Room IDs
 const CAMERA_ON_ROOM_IDS = ['1398715887728722104', '1300572813047894119', '1393209218055536680'];
 const CAMERA_OFF_ROOM_IDS = ['1393209353431027722', '1398719654805115102'];
 
-// ✅ Channels
+// ✅ Channel IDs
 const DAILY_CHANNEL_ID = '1367618478747680870';
 const WEEKLY_CHANNEL_ID = '1367618555339870208';
-const ANNOUNCEMENT_CHANNEL_ID = '1216562819135307797';
-
+const LEADERBOARD_REMINDER_CHANNEL_ID = '1216562819135307797';
 const DATA_FILE = './data.json';
+
 let data = { dailyData: {}, weeklyData: {}, studyData: {} };
 const joinTimestamps = {};
 
@@ -41,6 +41,63 @@ function saveData() {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
+function formatTime(hr) {
+  const h = Math.floor(hr);
+  const m = Math.round((hr - h) * 60);
+  return `${h}h ${m}m`;
+}
+
+function getISTDateLabel(title) {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' });
+
+  if (title === 'Daily') {
+    const weekday = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long' }).format(now);
+    return `${weekday}, ${formatter.format(now)}`;
+  } else if (title === 'Weekly') {
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const weekStart = new Date(nowIST);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const start = formatter.format(weekStart);
+    const end = formatter.format(nowIST);
+    return `Week: ${start} → ${end}`;
+  }
+}
+
+// ✅ Leaderboard Embed (Box Table Style)
+async function generateLeaderboardEmbed(title, dataset) {
+  const camOnSorted = Object.entries(dataset)
+    .sort(([, a], [, b]) => b.camOn - a.camOn)
+    .slice(0, 10);
+  const camOffSorted = Object.entries(dataset)
+    .sort(([, a], [, b]) => b.camOff - a.camOff)
+    .slice(0, 10);
+
+  const label = getISTDateLabel(title);
+
+  function makeTable(sorted, type) {
+    let text = "```";
+    text += "\n# | Name              | Hours\n";
+    text += "-----------------------------\n";
+    sorted.forEach(([id, h], i) => {
+      const total = type === 'camOn' ? h.camOn : h.camOff;
+      text += `${String(i + 1).padEnd(2)}| ${(client.guilds.cache.first()?.members.cache.get(id)?.displayName || `User ${id}`).slice(0, 15).padEnd(17)}| ${formatTime(total)}\n`;
+    });
+    return text + "```";
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle(`🏆 **${title} Leaderboard** — ${label}`)
+    .setColor(0x00bfff)
+    .addFields(
+      { name: "📷 **Camera On**", value: camOnSorted.length ? makeTable(camOnSorted, 'camOn') : "_No data yet!_", inline: false },
+      { name: "📴 **Camera Off**", value: camOffSorted.length ? makeTable(camOffSorted, 'camOff') : "_No data yet!_", inline: false }
+    )
+    .setFooter({ text: 'Unstoppable | Hustle every day!' });
+
+  return embed;
+}
+
 client.once('ready', async () => {
   loadData();
 
@@ -49,37 +106,54 @@ client.once('ready', async () => {
     guild.channels.cache.forEach(channel => {
       if (channel.type === 2) {
         channel.members.forEach(member => {
-          if (!joinTimestamps[member.id]) {
-            joinTimestamps[member.id] = Date.now();
-          }
+          if (!joinTimestamps[member.id]) joinTimestamps[member.id] = Date.now();
         });
       }
     });
   });
 
+  // ✅ Instant Slash Command Registration (Guild-based)
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   const commands = [
     new SlashCommandBuilder().setName('myhours').setDescription("Check today's study hours.")
       .addUserOption(opt => opt.setName('user').setDescription('User').setRequired(false)),
+    new SlashCommandBuilder().setName('addhours').setDescription('Add hours for a user.')
+      .addUserOption(opt => opt.setName('user').setDescription('User').setRequired(true))
+      .addIntegerOption(opt => opt.setName('hours').setDescription('Hours').setRequired(true))
+      .addStringOption(opt => opt.setName('type').setDescription('Camera Type').setRequired(true)
+        .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
+    new SlashCommandBuilder().setName('removehours').setDescription('Remove hours for a user.')
+      .addUserOption(opt => opt.setName('user').setDescription('User').setRequired(true))
+      .addIntegerOption(opt => opt.setName('hours').setDescription('Hours').setRequired(true))
+      .addStringOption(opt => opt.setName('type').setDescription('Camera Type').setRequired(true)
+        .addChoices({ name: 'Camera On', value: 'camOn' }, { name: 'Camera Off', value: 'camOff' })),
     new SlashCommandBuilder().setName('leaderboard').setDescription('Show the leaderboard manually (Admin only).')
       .addStringOption(opt => opt.setName('type').setDescription('Leaderboard Type').setRequired(true)
-        .addChoices({ name: 'Daily', value: 'daily' }, { name: 'Weekly', value: 'weekly' })),
+        .addChoices({ name: 'Daily', value: 'daily' }, { name: 'Weekly', value: 'weekly' }))
   ];
-  await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands.map(cmd => cmd.toJSON()) });
-  console.log(`✅ Bot is online as ${client.user.tag}`);
+
+  try {
+    const guildId = process.env.GUILD_ID;
+    await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId), { body: commands.map(cmd => cmd.toJSON()) });
+    console.log(`✅ Slash commands registered instantly for guild: ${guildId}`);
+  } catch (err) {
+    console.error("❌ Error registering commands:", err);
+  }
+
+  console.log(`Bot is online as ${client.user.tag}`);
 });
 
+// ✅ Voice State Tracking
 client.on('voiceStateUpdate', (oldState, newState) => {
   const userId = newState.id;
 
   if (!oldState.channelId && newState.channelId) {
-    // Only track allowed rooms
-    if ([...CAMERA_ON_ROOM_IDS, ...CAMERA_OFF_ROOM_IDS].includes(newState.channelId)) {
-      joinTimestamps[userId] = Date.now();
-    }
+    if (![...CAMERA_ON_ROOM_IDS, ...CAMERA_OFF_ROOM_IDS].includes(newState.channelId)) return;
+    joinTimestamps[userId] = Date.now();
   }
 
   if (oldState.channelId && !newState.channelId) {
+    if (![...CAMERA_ON_ROOM_IDS, ...CAMERA_OFF_ROOM_IDS].includes(oldState.channelId)) return;
     const startTime = joinTimestamps[userId];
     if (!startTime) return;
 
@@ -96,132 +170,69 @@ client.on('voiceStateUpdate', (oldState, newState) => {
   }
 });
 
-// ✅ Format time
-function formatTime(hr) {
-  const h = Math.floor(hr);
-  const m = Math.round((hr - h) * 60);
-  return `${h}h ${m}m`;
-}
+// ✅ Auto Save Every Minute
+cron.schedule('* * * * *', () => {
+  const now = Date.now();
+  for (const userId in joinTimestamps) {
+    const member = client.guilds.cache.first()?.members.cache.get(userId);
+    if (!member?.voice.channelId) continue;
+    if (![...CAMERA_ON_ROOM_IDS, ...CAMERA_OFF_ROOM_IDS].includes(member.voice.channelId)) continue;
 
-// ✅ Generate Stylish Table Leaderboard
-function generateTable(sorted, type) {
-  if (sorted.length === 0) return `No data yet for ${type}.`;
-
-  let table = `\`\`\`\n# | Name              | Hrs\n------------------------------\n`;
-  sorted.forEach(([id, h], i) => {
-    const total = type === 'camOn' ? h.camOn : h.camOff;
-    table += `${String(i + 1).padEnd(2)}| ${String(h.username || `User`).padEnd(17)}| ${formatTime(total)}\n`;
-  });
-  table += `\`\`\``;
-  return table;
-}
-
-// ✅ Fetch Username
-async function attachUsernames(dataset) {
-  const guild = client.guilds.cache.first();
-  for (const id of Object.keys(dataset)) {
-    try {
-      const member = guild.members.cache.get(id) || await guild.members.fetch(id);
-      dataset[id].username = member.displayName;
-    } catch {
-      dataset[id].username = `User`;
+    const camType = CAMERA_ON_ROOM_IDS.includes(member.voice.channelId) ? 'camOn' : 'camOff';
+    for (const dataset of [data.studyData, data.dailyData, data.weeklyData]) {
+      if (!dataset[userId]) dataset[userId] = { camOn: 0, camOff: 0 };
+      dataset[userId][camType] += 1 / 60;
     }
+
+    joinTimestamps[userId] = now;
   }
-}
+  saveData();
+});
 
-// ✅ Generate Embed
-async function generateLeaderboardEmbed(title, dataset) {
-  await attachUsernames(dataset);
+// ✅ Auto Daily Challenge Post
+const motivationalQuotes = [
+  "Push yourself, because no one else is going to do it for you.",
+  "Every minute counts. Make it worth it.",
+  "Study now, shine later.",
+  "Today’s hustle, tomorrow’s success.",
+  "Discipline is the bridge between goals and achievement."
+];
 
-  const camOnSorted = Object.entries(dataset).sort(([, a], [, b]) => b.camOn - a.camOn).slice(0, 10);
-  const camOffSorted = Object.entries(dataset).sort(([, a], [, b]) => b.camOff - a.camOff).slice(0, 10);
-
-  return new EmbedBuilder()
-    .setTitle(`🏆 **${title} Leaderboard**`)
-    .setColor(0x00bfff)
-    .addFields(
-      { name: `📷 **Camera ON Top 10**`, value: generateTable(camOnSorted, 'camOn') },
-      { name: `📴 **Camera OFF Top 10**`, value: generateTable(camOffSorted, 'camOff') }
-    )
-    .setFooter({ text: `Unstoppable | Owner: Yashwant Kumar` });
-}
-
-// ✅ Auto Challenge Post
 cron.schedule('0 0 * * *', () => {
-  const quotes = [
-    "Push yourself, because no one else is going to do it for you.",
-    "Every minute counts. Make it worth it.",
-    "Study now, shine later.",
-    "Today’s hustle, tomorrow’s success."
-  ];
-  const quote = quotes[Math.floor(Math.random() * quotes.length)];
-  const ch = client.channels.cache.get(ANNOUNCEMENT_CHANNEL_ID);
+  const quote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
+  const channel = client.channels.cache.get(LEADERBOARD_REMINDER_CHANNEL_ID);
 
   const embed = new EmbedBuilder()
     .setColor(0xffcc00)
-    .setTitle("⏰ **12:00 AM Daily Challenge**")
-    .setDescription(`>>> **“${quote}”**\nGrind starts now! Let's make it count!`)
+    .setTitle("⏰ 12:00 AM Daily Challenge")
+    .setDescription(`>>> **“${quote}”**\n\n__Do you have what it takes to be on today's leaderboard?__`)
+    .setThumbnail('https://cdn-icons-png.flaticon.com/512/1055/1055646.png')
+    .setFooter({ text: 'Unstoppable | Leaderboard resets daily at midnight IST' })
     .setTimestamp();
 
-  ch?.send({ content: '@everyone', embeds: [embed] });
+  channel?.send({ content: '@everyone', embeds: [embed] });
 }, { timezone: 'Asia/Kolkata' });
 
-// ✅ Auto Daily Leaderboard + Topper of the Day
-cron.schedule('59 23 * * *', async () => {
+// ✅ Auto Daily Leaderboard
+cron.schedule('59 23 * * *', () => {
   const ch = client.channels.cache.get(DAILY_CHANNEL_ID);
-  const ann = client.channels.cache.get(ANNOUNCEMENT_CHANNEL_ID);
-
-  const embed = await generateLeaderboardEmbed('Daily', data.dailyData);
-  ch?.send({ content: '@everyone', embeds: [embed] });
-
-  // ✅ Topper of the Day
-  const topOn = Object.entries(data.dailyData).sort(([, a], [, b]) => b.camOn - a.camOn)[0];
-  const topOff = Object.entries(data.dailyData).sort(([, a], [, b]) => b.camOff - a.camOff)[0];
-
-  if (topOn || topOff) {
-    const topperEmbed = new EmbedBuilder()
-      .setColor(0x4caf50)
-      .setTitle("🥇 **Topper of the Day**")
-      .addFields(
-        topOn ? { name: "📷 Camera ON", value: `**${topOn[1].username}** - ${formatTime(topOn[1].camOn)}` } : {},
-        topOff ? { name: "📴 Camera OFF", value: `**${topOff[1].username}** - ${formatTime(topOff[1].camOff)}` } : {}
-      )
-      .setTimestamp();
-
-    ann?.send({ content: '@everyone', embeds: [topperEmbed] });
-  }
-
-  data.dailyData = {};
-  saveData();
+  (async () => {
+    const embed = await generateLeaderboardEmbed('Daily', data.dailyData);
+    ch?.send({ content: '@everyone', embeds: [embed] });
+    data.dailyData = {};
+    saveData();
+  })();
 }, { timezone: 'Asia/Kolkata' });
 
-// ✅ Auto Weekly Leaderboard + Topper of the Week
-cron.schedule('59 23 * * 0', async () => {
+// ✅ Auto Weekly Leaderboard
+cron.schedule('59 23 * * 0', () => {
   const ch = client.channels.cache.get(WEEKLY_CHANNEL_ID);
-  const ann = client.channels.cache.get(ANNOUNCEMENT_CHANNEL_ID);
-
-  const embed = await generateLeaderboardEmbed('Weekly', data.weeklyData);
-  ch?.send({ content: '@everyone', embeds: [embed] });
-
-  // ✅ Topper of the Week
-  const topOn = Object.entries(data.weeklyData).sort(([, a], [, b]) => b.camOn - a.camOn)[0];
-  const topOff = Object.entries(data.weeklyData).sort(([, a], [, b]) => b.camOff - a.camOff)[0];
-
-  if (topOn || topOff) {
-    const topperEmbed = new EmbedBuilder()
-      .setColor(0xff9800)
-      .setTitle("🏆 **Topper of the Week**")
-      .addFields(
-        topOn ? { name: "📷 Camera ON", value: `**${topOn[1].username}** - ${formatTime(topOn[1].camOn)}` } : {},
-        topOff ? { name: "📴 Camera OFF", value: `**${topOff[1].username}** - ${formatTime(topOff[1].camOff)}` } : {}
-      )
-      .setTimestamp();
-
-    ann?.send({ content: '@everyone', embeds: [topperEmbed] });
-  }
-
-  data.weeklyData = {};
-  saveData();
+  (async () => {
+    const embed = await generateLeaderboardEmbed('Weekly', data.weeklyData);
+    ch?.send({ content: '@everyone', embeds: [embed] });
+    data.weeklyData = {};
+    saveData();
+  })();
 }, { timezone: 'Asia/Kolkata' });
 
 client.login(process.env.TOKEN);
