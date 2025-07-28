@@ -44,8 +44,6 @@ const silentTaglines = ["Silent Hustle", "Quiet Grind", "Alone But Focused", "Pe
 
 client.once('ready', async () => {
   loadData();
-  
-    // ✅ Restore joinTimestamps only for Camera On/Off rooms
   client.guilds.cache.forEach(guild => {
     guild.channels.cache.forEach(channel => {
       if (channel.type === 2 && (CAMERA_ON_ROOM_IDS.includes(channel.id) || CAMERA_OFF_ROOM_IDS.includes(channel.id))) {
@@ -67,7 +65,6 @@ client.once('ready', async () => {
       .addStringOption(opt => opt.setName('type').setDescription('Leaderboard Type').setRequired(true)
         .addChoices({ name: 'Daily', value: 'daily' }, { name: 'Weekly', value: 'weekly' })),
   ];
-
   await rest.put(
     Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
     { body: commands.map(cmd => cmd.toJSON()) }
@@ -76,10 +73,8 @@ client.once('ready', async () => {
   console.log(`✅ Bot is online as ${client.user.tag}`);
 });
 
-// Track Voice State
 client.on('voiceStateUpdate', (oldState, newState) => {
   const userId = newState.id;
-
   if (!oldState.channelId && newState.channelId) {
     if (CAMERA_ON_ROOM_IDS.includes(newState.channelId) || CAMERA_OFF_ROOM_IDS.includes(newState.channelId)) {
       joinTimestamps[userId] = Date.now();
@@ -89,7 +84,6 @@ client.on('voiceStateUpdate', (oldState, newState) => {
   if (oldState.channelId && !newState.channelId) {
     const startTime = joinTimestamps[userId];
     if (!startTime) return;
-
     const durationHrs = (Date.now() - startTime) / 3600000;
     const camType = CAMERA_ON_ROOM_IDS.includes(oldState.channelId) ? 'camOn' : 'camOff';
 
@@ -97,7 +91,6 @@ client.on('voiceStateUpdate', (oldState, newState) => {
       if (!dataset[userId]) dataset[userId] = { camOn: 0, camOff: 0 };
       dataset[userId][camType] += durationHrs;
     }
-
     saveData();
     delete joinTimestamps[userId];
   }
@@ -112,45 +105,25 @@ function formatTime(hr) {
 function getISTDateLabel(title) {
   const now = new Date();
   if (title === 'Daily') {
-    return new Intl.DateTimeFormat('en-IN', {
-      timeZone: 'Asia/Kolkata',
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }).format(now);
+    return new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now);
   } else {
     const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     const weekStart = new Date(nowIST);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    const start = new Intl.DateTimeFormat('en-IN', {
-      timeZone: 'Asia/Kolkata',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }).format(weekStart);
-    const end = new Intl.DateTimeFormat('en-IN', {
-      timeZone: 'Asia/Kolkata',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }).format(nowIST);
+    const start = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' }).format(weekStart);
+    const end = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' }).format(nowIST);
     return `Week: ${start} → ${end}`;
   }
 }
 
 async function generateLeaderboardEmbed(title, dataset) {
   const label = getISTDateLabel(title);
-
-  const camOnSorted = Object.entries(dataset)
-    .sort(([, a], [, b]) => b.camOn - a.camOn)
-    .slice(0, 10);
-  const camOffSorted = Object.entries(dataset)
-    .sort(([, a], [, b]) => b.camOff - a.camOff)
-    .slice(0, 10);
+  const camOnSorted = Object.entries(dataset).sort(([, a], [, b]) => b.camOn - a.camOn).slice(0, 10);
+  const camOffSorted = Object.entries(dataset).sort(([, a], [, b]) => b.camOff - a.camOff).slice(0, 10);
 
   const embed = new EmbedBuilder()
     .setTitle(`🏆 __${title} Leaderboard__ — ${label}`)
+    .setDescription(`**━━━━━━━━ SERVER INFO ━━━━━━━━**\n**Server:** __Unstoppable__\n**Owner:** __Yashwant Kumar__\n━━━━━━━━━━━━━━━━━━━━━━`)
     .setColor(0x00bfff)
     .setFooter({ text: 'Top 10 Students Hustling!' });
 
@@ -158,7 +131,7 @@ async function generateLeaderboardEmbed(title, dataset) {
   for (let i = 0; i < camOnSorted.length; i++) {
     const [id, h] = camOnSorted[i];
     const member = await client.users.fetch(id).catch(() => null);
-    camOnText += `${i + 1}. ${(member?.username || 'Unknown').padEnd(15)} ${formatTime(h.camOn)}\n`;
+    camOnText += `${String(i + 1).padEnd(2)} ${(member?.username || 'Unknown').padEnd(15)} ${formatTime(h.camOn)}\n`;
   }
   camOnText += `\`\`\``;
 
@@ -166,7 +139,7 @@ async function generateLeaderboardEmbed(title, dataset) {
   for (let i = 0; i < camOffSorted.length; i++) {
     const [id, h] = camOffSorted[i];
     const member = await client.users.fetch(id).catch(() => null);
-    camOffText += `${i + 1}. ${(member?.username || 'Unknown').padEnd(15)} ${formatTime(h.camOff)}\n`;
+    camOffText += `${String(i + 1).padEnd(2)} ${(member?.username || 'Unknown').padEnd(15)} ${formatTime(h.camOff)}\n`;
   }
   camOffText += `\`\`\``;
 
@@ -180,7 +153,7 @@ async function generateLeaderboardEmbed(title, dataset) {
 
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
-  await interaction.deferReply(); // ✅ Fix added
+  await interaction.deferReply();
 
   const { commandName, user, options } = interaction;
   loadData();
@@ -193,7 +166,8 @@ client.on('interactionCreate', async interaction => {
     const today = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
     const embed = new EmbedBuilder()
-      .setTitle(`📊 ${target.username}'s Study Report — ${today}`)
+      .setTitle(`📊 __${target.username}'s Study Report__ — ${today}`)
+      .setDescription(`**━━━━━━━━ SERVER INFO ━━━━━━━━**\n**Server:** __Unstoppable__\n**Owner:** __Yashwant Kumar__\n━━━━━━━━━━━━━━━━━━━━━━`)
       .addFields(
         { name: '✅ Camera On', value: `**${formatTime(hours.camOn)}**\n_${focusTag}_`, inline: true },
         { name: '❌ Camera Off', value: `**${formatTime(hours.camOff)}**\n_${silentTag}_`, inline: true },
@@ -213,15 +187,12 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Auto Tracking every minute
 cron.schedule('* * * * *', () => {
   const now = Date.now();
   for (const userId in joinTimestamps) {
     const startTime = joinTimestamps[userId];
-    const durationMin = (now - startTime) / 60000;
     const member = client.guilds.cache.first()?.members.cache.get(userId);
     if (!member?.voice.channelId) continue;
-
     if (CAMERA_ON_ROOM_IDS.includes(member.voice.channelId) || CAMERA_OFF_ROOM_IDS.includes(member.voice.channelId)) {
       const camType = CAMERA_ON_ROOM_IDS.includes(member.voice.channelId) ? 'camOn' : 'camOff';
       for (const dataset of [data.studyData, data.dailyData, data.weeklyData]) {
@@ -234,24 +205,16 @@ cron.schedule('* * * * *', () => {
   saveData();
 });
 
-// Daily Challenge 12:00 AM
 cron.schedule('0 0 * * *', () => {
-  const quote = [
-    "Push yourself, because no one else is going to do it for you.",
-    "Every minute counts. Make it worth it.",
-    "Study now, shine later."
-  ][Math.floor(Math.random() * 3)];
-
+  const quote = ["Push yourself, because no one else is going to do it for you.", "Every minute counts. Make it worth it.", "Study now, shine later."][Math.floor(Math.random() * 3)];
   const embed = new EmbedBuilder()
     .setColor(0xffcc00)
     .setTitle("⏰ 12:00 AM Daily Challenge")
     .setDescription(`>>> **“${quote}”**\n\nStart your grind now!`)
     .setFooter({ text: 'Leaderboard resets daily at midnight IST' });
-
   client.channels.cache.get(LEADERBOARD_REMINDER_CHANNEL_ID)?.send({ content: '@everyone', embeds: [embed] });
 }, { timezone: 'Asia/Kolkata' });
 
-// Daily Leaderboard 11:59 PM
 cron.schedule('59 23 * * *', async () => {
   const embed = await generateLeaderboardEmbed('Daily', data.dailyData);
   client.channels.cache.get(DAILY_CHANNEL_ID)?.send({ content: '@everyone', embeds: [embed] });
@@ -259,7 +222,6 @@ cron.schedule('59 23 * * *', async () => {
   saveData();
 }, { timezone: 'Asia/Kolkata' });
 
-// Weekly Leaderboard Sunday 11:59 PM
 cron.schedule('59 23 * * 0', async () => {
   const embed = await generateLeaderboardEmbed('Weekly', data.weeklyData);
   client.channels.cache.get(WEEKLY_CHANNEL_ID)?.send({ content: '@everyone', embeds: [embed] });
