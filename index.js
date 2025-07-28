@@ -44,6 +44,20 @@ const silentTaglines = ["Silent Hustle", "Quiet Grind", "Alone But Focused", "Pe
 
 client.once('ready', async () => {
   loadData();
+  
+    // ✅ Restore joinTimestamps only for Camera On/Off rooms
+  client.guilds.cache.forEach(guild => {
+    guild.channels.cache.forEach(channel => {
+      if (channel.type === 2 && (CAMERA_ON_ROOM_IDS.includes(channel.id) || CAMERA_OFF_ROOM_IDS.includes(channel.id))) {
+        channel.members.forEach(member => {
+          if (!joinTimestamps[member.id]) {
+            joinTimestamps[member.id] = Date.now();
+            console.log(`Tracking restored for ${member.user.username} in ${channel.name}`);
+          }
+        });
+      }
+    });
+  });
 
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   const commands = [
