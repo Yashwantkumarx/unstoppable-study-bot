@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Collection, PermissionsBitField, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, Collection, EmbedBuilder } = require('discord.js');
 const cron = require('node-cron');
 const fs = require('fs');
 require('dotenv').config();
@@ -127,25 +127,20 @@ async function generateLeaderboardEmbed(title, dataset) {
     .setColor(0x00bfff)
     .setFooter({ text: 'Top 10 Students Hustling!' });
 
-  let camOnText = `\`\`\`\n#  USER             HOURS\n━━━━━━━━━━━━━━━━━━━━━━\n`;
-  for (let i = 0; i < camOnSorted.length; i++) {
-    const [id, h] = camOnSorted[i];
-    const member = await client.users.fetch(id).catch(() => null);
-    camOnText += `${String(i + 1).padEnd(2)} ${(member?.username || 'Unknown').padEnd(15)} ${formatTime(h.camOn)}\n`;
+  function makeTable(sorted, type) {
+    let text = `\`\`\`\n#  USER             HOURS\n━━━━━━━━━━━━━━━━━━━━━━\n`;
+    for (let i = 0; i < sorted.length; i++) {
+      const [id, h] = sorted[i];
+      const member = client.users.cache.get(id) || { username: "Unknown" };
+      text += `${String(i + 1).padEnd(2)} ${(member.username).padEnd(15)} ${formatTime(h[type])}\n`;
+    }
+    text += `\`\`\``;
+    return text;
   }
-  camOnText += `\`\`\``;
-
-  let camOffText = `\`\`\`\n#  USER             HOURS\n━━━━━━━━━━━━━━━━━━━━━━\n`;
-  for (let i = 0; i < camOffSorted.length; i++) {
-    const [id, h] = camOffSorted[i];
-    const member = await client.users.fetch(id).catch(() => null);
-    camOffText += `${String(i + 1).padEnd(2)} ${(member?.username || 'Unknown').padEnd(15)} ${formatTime(h.camOff)}\n`;
-  }
-  camOffText += `\`\`\``;
 
   embed.addFields(
-    { name: "📷 Camera On", value: camOnText || "No data yet!" },
-    { name: "❌ Camera Off", value: camOffText || "No data yet!" }
+    { name: "📷 Camera On", value: camOnSorted.length ? makeTable(camOnSorted, 'camOn') : "No data yet!" },
+    { name: "❌ Camera Off", value: camOffSorted.length ? makeTable(camOffSorted, 'camOff') : "No data yet!" }
   );
 
   return embed;
@@ -169,9 +164,9 @@ client.on('interactionCreate', async interaction => {
       .setTitle(`📊 __${target.username}'s Study Report__ — ${today}`)
       .setDescription(`**━━━━━━━━ SERVER INFO ━━━━━━━━**\n**Server:** __Unstoppable__\n**Owner:** __Yashwant Kumar__\n━━━━━━━━━━━━━━━━━━━━━━`)
       .addFields(
-        { name: '✅ Camera On', value: `**${formatTime(hours.camOn)}**\n_${focusTag}_`, inline: true },
-        { name: '❌ Camera Off', value: `**${formatTime(hours.camOff)}**\n_${silentTag}_`, inline: true },
-        { name: '__⏳ Total__', value: `**${formatTime(hours.camOn + hours.camOff)}**`, inline: false }
+        { name: '✅ Camera On', value: `\`\`\`\n${formatTime(hours.camOn)}\n━━━━━━━━━━\n${focusTag}\`\`\``, inline: true },
+        { name: '❌ Camera Off', value: `\`\`\`\n${formatTime(hours.camOff)}\n━━━━━━━━━━\n${silentTag}\`\`\``, inline: true },
+        { name: '__⏳ Total__', value: `\`\`\`\n${formatTime(hours.camOn + hours.camOff)}\n━━━━━━━━━━\`\`\``, inline: false }
       )
       .setColor(0x4e9af1)
       .setFooter({ text: 'Keep grinding! You’re unstoppable!' });
