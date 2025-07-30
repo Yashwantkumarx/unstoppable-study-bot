@@ -64,6 +64,18 @@ client.once('ready', async () => {
     new SlashCommandBuilder().setName('leaderboard').setDescription('Show leaderboard.')
       .addStringOption(opt => opt.setName('type').setDescription('Leaderboard Type').setRequired(true)
         .addChoices({ name: 'Daily', value: 'daily' }, { name: 'Weekly', value: 'weekly' })),
+    new SlashCommandBuilder()
+  .setName('rank')
+  .setDescription("Show your leaderboard rank.")
+  .addStringOption(opt => opt
+    .setName('type')
+    .setDescription('Leaderboard type')
+    .setRequired(true)
+    .addChoices(
+      { name: 'Daily', value: 'daily' },
+      { name: 'Weekly', value: 'weekly' },
+      { name: 'Total', value: 'total' }
+    )),
   ];
   await rest.put(
     Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
@@ -75,15 +87,22 @@ client.once('ready', async () => {
 
 client.on('voiceStateUpdate', (oldState, newState) => {
   const userId = newState.id;
-  if (!oldState.channelId && newState.channelId) {
-    if (CAMERA_ON_ROOM_IDS.includes(newState.channelId) || CAMERA_OFF_ROOM_IDS.includes(newState.channelId)) {
-      joinTimestamps[userId] = Date.now();
-    }
+
+  const isStudyChannel = id => CAMERA_ON_ROOM_IDS.includes(id) || CAMERA_OFF_ROOM_IDS.includes(id);
+
+  const leftStudyChannel = isStudyChannel(oldState.channelId);
+  const joinedStudyChannel = isStudyChannel(newState.channelId);
+
+  // If user joined a study VC
+  if (!oldState.channelId && joinedStudyChannel) {
+    joinTimestamps[userId] = Date.now();
   }
 
-  if (oldState.channelId && !newState.channelId) {
+  // If user left study VC completely
+  else if (leftStudyChannel && !newState.channelId) {
     const startTime = joinTimestamps[userId];
     if (!startTime) return;
+
     const durationHrs = (Date.now() - startTime) / 3600000;
     const camType = CAMERA_ON_ROOM_IDS.includes(oldState.channelId) ? 'camOn' : 'camOff';
 
@@ -91,8 +110,27 @@ client.on('voiceStateUpdate', (oldState, newState) => {
       if (!dataset[userId]) dataset[userId] = { camOn: 0, camOff: 0 };
       dataset[userId][camType] += durationHrs;
     }
-    saveData();
+
     delete joinTimestamps[userId];
+    saveData();
+  }
+
+  // If user switched between study VCs (e.g., camOn <-> camOff)
+  else if (leftStudyChannel && joinedStudyChannel && oldState.channelId !== newState.channelId) {
+    const startTime = joinTimestamps[userId];
+    if (!startTime) return;
+
+    const durationHrs = (Date.now() - startTime) / 3600000;
+    const oldCamType = CAMERA_ON_ROOM_IDS.includes(oldState.channelId) ? 'camOn' : 'camOff';
+
+    for (const dataset of [data.studyData, data.dailyData, data.weeklyData]) {
+      if (!dataset[userId]) dataset[userId] = { camOn: 0, camOff: 0 };
+      dataset[userId][oldCamType] += durationHrs;
+    }
+
+    // Start new timer for new VC
+    joinTimestamps[userId] = Date.now();
+    saveData();
   }
 });
 
@@ -127,21 +165,22 @@ async function generateLeaderboardEmbed(title, dataset) {
     .setColor(0x00bfff)
     .setFooter({ text: 'Top 10 Students Hustling!' });
 
-  function makeTable(sorted, type) {
-    let text = `\`\`\`\n#  USER             HOURS\n━━━━━━━━━━━━━━━━━━━━━━\n`;
-    for (let i = 0; i < sorted.length; i++) {
-      const [id, h] = sorted[i];
-      const member = client.users.cache.get(id) || { username: "Unknown" };
-      text += `${String(i + 1).padEnd(2)} ${(member.username).padEnd(15)} ${formatTime(h[type])}\n`;
-    }
-    text += `\`\`\``;
-    return text;
+async function makeTable(sorted, type) {
+  let text = `\`\`\`\n#  USER             HOURS\n━━━━━━━━━━━━━━━━━━━━━━\n`;
+  for (let i = 0; i < sorted.length; i++) {
+    const [id, h] = sorted[i];
+    const user = client.users.cache.get(id) || await client.users.fetch(id).catch(() => null);
+    const username = user?.username || "Unknown";
+    text += `${String(i + 1).padEnd(2)} ${username.padEnd(15)} ${formatTime(h[type])}\n`;
   }
+  text += `\`\`\``;
+  return text;
+}
 
-  embed.addFields(
-    { name: "📷 Camera On", value: camOnSorted.length ? makeTable(camOnSorted, 'camOn') : "No data yet!" },
-    { name: "❌ Camera Off", value: camOffSorted.length ? makeTable(camOffSorted, 'camOff') : "No data yet!" }
-  );
+embed.addFields(
+  { name: "📷 Camera On", value: camOnSorted.length ? await makeTable(camOnSorted, 'camOn') : "No data yet!" },
+  { name: "❌ Camera Off", value: camOffSorted.length ? await makeTable(camOffSorted, 'camOff') : "No data yet!" }
+);
 
   return embed;
 }
@@ -181,6 +220,34 @@ client.on('interactionCreate', async interaction => {
     return interaction.editReply({ embeds: [embed] });
   }
 });
+if (commandName === 'rank') {
+  const type = options.getString('type');
+  const target = user;
+  const dataset =
+    type === 'daily' ? data.dailyData :
+    type === 'weekly' ? data.weeklyData :
+    data.studyData;
+
+  const entries = Object.entries(dataset);
+  const sorted = entries.sort(([, a], [, b]) => (b.camOn + b.camOff) - (a.camOn + a.camOff));
+  const rankIndex = sorted.findIndex(([id]) => id === target.id);
+  const userData = dataset[target.id] || { camOn: 0, camOff: 0 };
+
+  const totalTime = userData.camOn + userData.camOff;
+
+  const embed = new EmbedBuilder()
+    .setTitle(`📈 ${target.username}'s Rank — ${type.toUpperCase()} Leaderboard`)
+    .addFields(
+      { name: '🎖 Rank', value: rankIndex !== -1 ? `#${rankIndex + 1}` : 'Unranked', inline: true },
+      { name: '✅ Camera On', value: `\`\`\`\n${formatTime(userData.camOn)}\n\`\`\``, inline: true },
+      { name: '❌ Camera Off', value: `\`\`\`\n${formatTime(userData.camOff)}\n\`\`\``, inline: true },
+      { name: '⏳ Total', value: `\`\`\`\n${formatTime(totalTime)}\n\`\`\``, inline: false }
+    )
+    .setColor(0xf39c12)
+    .setFooter({ text: `Based on ${type} leaderboard.` });
+
+  return interaction.editReply({ embeds: [embed] });
+}
 
 cron.schedule('* * * * *', () => {
   const now = Date.now();
@@ -225,3 +292,11 @@ cron.schedule('59 23 * * 0', async () => {
 }, { timezone: 'Asia/Kolkata' });
 
 client.login(process.env.TOKEN);
+// ========== CRASH SAFETY ==========
+process.on('unhandledRejection', err => {
+  console.error('❌ Unhandled Promise Rejection:', err);
+});
+
+process.on('uncaughtException', err => {
+  console.error('🔥 Uncaught Exception:', err);
+});
