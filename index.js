@@ -21,6 +21,7 @@ const CAMERA_OFF_ROOM_IDS = ['1393209353431027722', '1398719654805115102'];
 const DAILY_CHANNEL_ID = process.env.DAILY_CHANNEL_ID;
 const WEEKLY_CHANNEL_ID = process.env.WEEKLY_CHANNEL_ID;
 const LEADERBOARD_REMINDER_CHANNEL_ID = process.env.LEADERBOARD_REMINDER_CHANNEL_ID;
+const ANNOUNCEMENT_CHANNEL_ID = '1216562819135307797';
 const DATA_FILE = './data.json';
 
 let data = { dailyData: {}, weeklyData: {}, studyData: {} };
@@ -118,7 +119,6 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     saveData();
   }
 });
-
 function formatTime(hr) {
   const h = Math.floor(hr);
   const m = Math.round((hr - h) * 60);
@@ -167,7 +167,7 @@ async function generateLeaderboardEmbed(title, dataset) {
     { name: "❌ Camera Off", value: camOffSorted.length ? await makeTable(camOffSorted, 'camOff') : "No data yet!" }
   );
 
-  return embed;
+  return { embed, camOnTopper: camOnSorted[0], camOffTopper: camOffSorted[0] };
 }
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
@@ -200,7 +200,7 @@ client.on('interactionCreate', async interaction => {
   if (commandName === 'leaderboard') {
     const type = options.getString('type');
     const dataset = type === 'daily' ? data.dailyData : data.weeklyData;
-    const embed = await generateLeaderboardEmbed(type === 'daily' ? 'Daily' : 'Weekly', dataset);
+    const { embed } = await generateLeaderboardEmbed(type === 'daily' ? 'Daily' : 'Weekly', dataset);
     return interaction.editReply({ embeds: [embed] });
   }
 
@@ -233,57 +233,102 @@ client.on('interactionCreate', async interaction => {
     return interaction.editReply({ embeds: [embed] });
   }
 });
-// ========== CRON JOBS ==========
-
-cron.schedule('* * * * *', () => {
-  const now = Date.now();
-  for (const userId in joinTimestamps) {
-    const startTime = joinTimestamps[userId];
-    const member = client.guilds.cache.first()?.members.cache.get(userId);
-    if (!member?.voice.channelId) continue;
-    if (CAMERA_ON_ROOM_IDS.includes(member.voice.channelId) || CAMERA_OFF_ROOM_IDS.includes(member.voice.channelId)) {
-      const camType = CAMERA_ON_ROOM_IDS.includes(member.voice.channelId) ? 'camOn' : 'camOff';
-      for (const dataset of [data.studyData, data.dailyData, data.weeklyData]) {
-        if (!dataset[userId]) dataset[userId] = { camOn: 0, camOff: 0 };
-        dataset[userId][camType] += 1 / 60;
-      }
-      joinTimestamps[userId] = now;
-    }
-  }
-  saveData();
-});
-
-cron.schedule('0 0 * * *', () => {
-  const quote = ["Push yourself, because no one else is going to do it for you.", "Every minute counts. Make it worth it.", "Study now, shine later."][Math.floor(Math.random() * 3)];
-  const embed = new EmbedBuilder()
-    .setColor(0xffcc00)
-    .setTitle("⏰ 12:00 AM Daily Challenge")
-    .setDescription(`>>> **“${quote}”**\n\nStart your grind now!`)
-    .setFooter({ text: 'Leaderboard resets daily at midnight IST' });
-  client.channels.cache.get(LEADERBOARD_REMINDER_CHANNEL_ID)?.send({ content: '@everyone', embeds: [embed] });
-}, { timezone: 'Asia/Kolkata' });
+// ========== DAILY TOPPER ANNOUNCEMENT ==========
 
 cron.schedule('59 23 * * *', async () => {
   const embed = await generateLeaderboardEmbed('Daily', data.dailyData);
   client.channels.cache.get(DAILY_CHANNEL_ID)?.send({ content: '@everyone', embeds: [embed] });
+
+  const camOnTop = Object.entries(data.dailyData).sort(([, a], [, b]) => b.camOn - a.camOn)[0];
+  const camOffTop = Object.entries(data.dailyData).sort(([, a], [, b]) => b.camOff - a.camOff)[0];
+
+  const announcementChannel = client.channels.cache.get('1216562819135307797'); // Announcement room
+
+  if (camOnTop) {
+    const user = await client.users.fetch(camOnTop[0]).catch(() => null);
+    announcementChannel?.send({
+      content: `🎉 Congrats to **${user?.username || "Topper"}** for topping today's 📷 **Camera On** leaderboard! Keep hustling! 💪`,
+    });
+  }
+
+  if (camOffTop) {
+    const user = await client.users.fetch(camOffTop[0]).catch(() => null);
+    announcementChannel?.send({
+      content: `📢 Shoutout to **${user?.username || "Topper"}** for leading today's ❌ **Camera Off** leaderboard! Silent grinding is real! 🧠`,
+    });
+  }
+
   data.dailyData = {};
   saveData();
 }, { timezone: 'Asia/Kolkata' });
 
+// ========== WEEKLY TOPPER ANNOUNCEMENT ==========
+
 cron.schedule('59 23 * * 0', async () => {
   const embed = await generateLeaderboardEmbed('Weekly', data.weeklyData);
   client.channels.cache.get(WEEKLY_CHANNEL_ID)?.send({ content: '@everyone', embeds: [embed] });
+
+  const camOnTop = Object.entries(data.weeklyData).sort(([, a], [, b]) => b.camOn - a.camOn)[0];
+  const camOffTop = Object.entries(data.weeklyData).sort(([, a], [, b]) => b.camOff - a.camOff)[0];
+
+  const announcementChannel = client.channels.cache.get('1216562819135307797');
+
+  if (camOnTop) {
+    const user = await client.users.fetch(camOnTop[0]).catch(() => null);
+    announcementChannel?.send({
+      content: `🏆 Weekly 📷 **Camera On** topper is **${user?.username || "Topper"}**! Insane focus all week! 🔥`,
+    });
+  }
+
+  if (camOffTop) {
+    const user = await client.users.fetch(camOffTop[0]).catch(() => null);
+    announcementChannel?.send({
+      content: `🏅 Weekly ❌ **Camera Off** topper is **${user?.username || "Topper"}**! Consistent hustle in silence! 😤`,
+    });
+  }
+
   data.weeklyData = {};
   saveData();
 }, { timezone: 'Asia/Kolkata' });
+// ========== AUTO MOTIVATIONAL MESSAGE EVERY 4 HOURS ==========
 
-client.login(process.env.TOKEN);
+const MOTIVATIONAL_QUOTES = [
+  "Success doesn’t come from what you do occasionally, it comes from what you do consistently.",
+  "Stay focused and never give up on your dreams!",
+  "Grind in silence, let your success make the noise.",
+  "You are doing great — just keep going!",
+  "Discipline is choosing between what you want now and what you want most.",
+  "Every study minute you put in today is one step closer to your goals.",
+  "Winners are not those who never fail, but those who never quit.",
+  "Your future self is watching you. Don’t disappoint them!",
+  "Don’t stop until you’re proud.",
+  "Work hard in silence, let success be your noise.",
+];
 
+cron.schedule('0 */4 * * *', () => {
+  const announcementChannel = client.channels.cache.get('1216562819135307797');
+  const quote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
+
+  if (announcementChannel) {
+    announcementChannel.send({
+      content: `💡 **Motivation Boost!**\n>>> *${quote}*`,
+    });
+  }
+}, { timezone: 'Asia/Kolkata' });
 // ========== CRASH SAFETY ==========
+
 process.on('unhandledRejection', err => {
   console.error('❌ Unhandled Promise Rejection:', err);
 });
 
 process.on('uncaughtException', err => {
   console.error('🔥 Uncaught Exception:', err);
+});
+
+// ========== BOT LOGIN ==========
+
+client.login(process.env.TOKEN).then(() => {
+  console.log("✅ Bot has been successfully logged in.");
+}).catch(err => {
+  console.error("❌ Failed to log in:", err);
 });
